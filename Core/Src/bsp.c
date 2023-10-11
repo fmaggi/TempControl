@@ -1,10 +1,12 @@
 #include "ILI9341_GFX.h"
 #include "ILI9341_STM32_Driver.h"
 #include "adc.h"
+#include "bsp.h"
 #include "dma.h"
 #include "gpio.h"
 #include "spi.h"
 #include "stm32f1xx_hal_adc.h"
+#include "stm32f1xx_hal_tim.h"
 #include "tim.h"
 
 #include <bsp_internal.h>
@@ -19,7 +21,8 @@ static const uint32_t MAX_PERIOD = HALF_CYCLE_TIME / TICK;
 static const uint32_t POWER_TO_PERIOD = MAX_PERIOD / MAX_POWER;
 static const uint32_t HALF_POWER = MAX_POWER / 2;
 
-static volatile uint32_t power = 1800;
+static volatile uint32_t period1 = UNREACHABLE_PERIOD;
+static volatile uint32_t period2 = UNREACHABLE_PERIOD;
 
 static volatile uint8_t ok_clicked = 0;
 
@@ -27,7 +30,7 @@ void SystemClock_Config(void);
 
 static uint32_t pid(uint32_t temp);
 
-static volatile uint32_t temp = 0;
+static volatile uint32_t t = 0;
 
 void BSP_Init(void) {
     HAL_Init();
@@ -47,6 +50,8 @@ void BSP_Init(void) {
 
     BSP_Display_init();
 
+    HAL_TIM_Encoder_Start_IT(&htim4, TIM_CHANNEL_ALL);
+
     __HAL_DBGMCU_FREEZE_TIM1();
 }
 
@@ -60,7 +65,42 @@ uint8_t BSP_get_cursor(uint8_t current_cursor) {
 }
 
 uint8_t BSP_ok_clicked(void) {
-    return ok_clicked;
+    uint8_t temp = ok_clicked;
+    ok_clicked = 0;
+    return temp;
+}
+
+void BSP_start_temp_sensor(void) {
+    HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
+    HAL_ADC_Start_IT(&hadc1);
+}
+
+uint32_t BSP_get_temp(void) {
+    return t;
+}
+
+void BSP_start_power_step(void) {
+    HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
+    HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_2);
+    HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_3);
+}
+
+void BSP_stop_power_step(void) {
+    HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_1);
+    HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_2);
+    HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_3);
+}
+
+void BSP_set_power(uint32_t power) {
+    {
+        uint32_t power1 = power > HALF_POWER ? MAX_POWER : power * 2;
+        period1 = (MAX_POWER - power1) * POWER_TO_PERIOD;
+    }
+
+    {
+        uint32_t power2 = power >= HALF_POWER ? (power - HALF_POWER) * 2 : 0;
+        period2 = (MAX_POWER - power2) * POWER_TO_PERIOD;
+    }
 }
 
 /**
@@ -102,30 +142,20 @@ void SystemClock_Config(void) {
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-    if (GPIO_Pin == ZC_Pin) {
-        __disable_irq();
-        Handle_Zero_Crossing();
-        __enable_irq();
-    } else if (GPIO_Pin == Ok_Pin) {
-        ok_clicked = 1;
-    } else {
-        __NOP();
-    }
-}
-
-void Handle_Zero_Crossing(void) {
-    TIM3->CNT = 0x0;
-    TIM3->CCR1 = UNREACHABLE_PERIOD; // this should never be reached
-    TIM3->CCR2 = UNREACHABLE_PERIOD; // this shoudl never be reached
-
-    {
-        uint32_t power1 = power > HALF_POWER ? MAX_POWER : power * 2;
-        TIM3->CCR1 = (MAX_POWER - power1) * POWER_TO_PERIOD;
-    }
-
-    {
-        uint32_t power2 = power >= HALF_POWER ? (power - HALF_POWER) * 2 : 0;
-        TIM3->CCR2 = (MAX_POWER - power2) * POWER_TO_PERIOD;
+    switch (GPIO_Pin) {
+        case ZC_Pin: {
+            __disable_irq();
+            TIM3->CNT = 0x0;
+            TIM3->CCR1 = period1;
+            TIM3->CCR2 = period2;
+            __enable_irq();
+            break;
+        }
+        case Ok_Pin: {
+            ok_clicked = 1;
+            break;
+        }
+        default: break;
     }
 }
 
@@ -155,7 +185,7 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim) {
         HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_3);
 
         HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-        for (;;) {}
+        Error("404: Red de alimentacion not found!");
     } else {
         __NOP();
     }
@@ -163,18 +193,18 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim) {
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
-    temp = HAL_ADC_GetValue(hadc);
+    t = HAL_ADC_GetValue(hadc);
 }
 
 static uint32_t pid(uint32_t t) {
     return t;
-    if (power >= MAX_POWER) {
-        return 205;
-    }
-    return power + 1;
 }
 
-void Error_Handler(void) {
+__weak void Error(const char* msg) {
+    Error_Handler();
+}
+
+void Error_Handler() {
     /* USER CODE BEGIN Error_Handler_Debug */
     /* User can add his own implementation to report the HAL error return state */
     __disable_irq();

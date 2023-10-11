@@ -15,7 +15,13 @@ void BSP_Delay(uint32_t ms);
 uint8_t BSP_get_cursor(uint8_t current_cursor);
 uint8_t BSP_ok_clicked(void);
 
-void Error_Handler(void);
+void BSP_start_temp_sensor(void);
+uint32_t BSP_get_temp(void);
+
+void BSP_start_power_step(void);
+void BSP_set_power(uint32_t power);
+
+void Error(const char* msg);
 
 #ifdef __cplusplus
 }
