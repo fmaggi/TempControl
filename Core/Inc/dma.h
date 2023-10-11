@@ -26,7 +26,7 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
+#include <bsp_internal.h>
 
 /* DMA memory to memory transfer handles -------------------------------------*/
 

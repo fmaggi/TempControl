@@ -1,62 +1,16 @@
-/* USER CODE BEGIN Header */
-/**
- ******************************************************************************
- * @file           : main.c
- * @brief          : Main program body
- ******************************************************************************
- * @attention
- *
- * Copyright (c) 2023 STMicroelectronics.
- * All rights reserved.
- *
- * This software is licensed under terms that can be found in the LICENSE file
- * in the root directory of this software component.
- * If no LICENSE file comes with this software, it is provided AS-IS.
- *
- ******************************************************************************
- */
-/* USER CODE END Header */
-/* Includes ------------------------------------------------------------------*/
-#include "main.h"
-
+#include "ILI9341_GFX.h"
+#include "ILI9341_STM32_Driver.h"
 #include "adc.h"
 #include "dma.h"
 #include "gpio.h"
 #include "spi.h"
+#include "stm32f1xx_hal_adc.h"
 #include "tim.h"
 
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-#include "ILI9341_GFX.h"
-#include "ILI9341_STM32_Driver.h"
-#include "stm32f1xx_hal_adc.h"
-
+#include <bsp_internal.h>
 #include <stdint.h>
 #include <stdio.h>
-/* USER CODE END Includes */
 
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
-
-/* Private variables ---------------------------------------------------------*/
-
-/* USER CODE BEGIN PV */
-// TIM3 TICK is 250 ps.
-// Electrical network half cycle is 10 ms or 10000000 ps.
-// At this TICK we can measure up to 16.38 ms. This is more than enough
-// This also means that anything above 10 ms will never be reached, because
-// INT due to zero corssing resets the clock
 #define TICK               250
 #define HALF_CYCLE_TIME    10000000 // ps. Duration of a half cycle of the power network at 50Hz
 #define MAX_POWER          4096     // This is due to ADC conversion going from 0 to 4096
@@ -67,59 +21,19 @@ static const uint32_t HALF_POWER = MAX_POWER / 2;
 
 static volatile uint32_t power = 1800;
 
-enum State {
-    Entry1,
-    Entry2,
-    Entry3,
-};
-
-static volatile enum State current_state = Entry1;
-static volatile enum State next_state = Entry1;
 static volatile uint8_t ok_clicked = 0;
 
-/* USER CODE END PV */
-
-/* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-/* USER CODE BEGIN PFP */
 
 static uint32_t pid(uint32_t temp);
 
-/* USER CODE END PFP */
-
-/* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
-
 static volatile uint32_t temp = 0;
 
-/* USER CODE END 0 */
-
-/**
- * @brief  The application entry point.
- * @retval int
- */
-int main(void) {
-    /* USER CODE BEGIN 1 */
-
-    /* USER CODE END 1 */
-
-    /* MCU Configuration--------------------------------------------------------*/
-
-    /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+void BSP_Init(void) {
     HAL_Init();
 
-    /* USER CODE BEGIN Init */
-
-    /* USER CODE END Init */
-
-    /* Configure the system clock */
     SystemClock_Config();
 
-    /* USER CODE BEGIN SysInit */
-
-    /* USER CODE END SysInit */
-
-    /* Initialize all configured peripherals */
     MX_GPIO_Init();
     MX_DMA_Init();
     MX_TIM3_Init();
@@ -127,26 +41,26 @@ int main(void) {
     MX_TIM4_Init();
     MX_TIM1_Init();
     MX_ADC1_Init();
-    /* USER CODE BEGIN 2 */
 
-    HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
-    HAL_ADC_Start_IT(&hadc1);
+    /* HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1); */
+    /* HAL_ADC_Start_IT(&hadc1); */
+
+    BSP_Display_init();
 
     __HAL_DBGMCU_FREEZE_TIM1();
+}
 
-    /* USER CODE END 2 */
+void BSP_Delay(uint32_t ms) {
+    HAL_Delay(ms);
+}
 
-    /* Infinite loop */
-    /* USER CODE BEGIN WHILE */
-    while (1) {
-        /* USER CODE END WHILE */
+uint8_t BSP_get_cursor(uint8_t current_cursor) {
+    (void) current_cursor;
+    return (uint8_t) TIM4->CNT;
+}
 
-        /* USER CODE BEGIN 3 */
-        uint16_t t = TIM1->CNT;
-        (void) t;
-        HAL_Delay(1);
-    }
-    /* USER CODE END 3 */
+uint8_t BSP_ok_clicked(void) {
+    return ok_clicked;
 }
 
 /**
@@ -186,8 +100,6 @@ void SystemClock_Config(void) {
         Error_Handler();
     }
 }
-
-/* USER CODE BEGIN 4 */
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     if (GPIO_Pin == ZC_Pin) {
@@ -262,12 +174,6 @@ static uint32_t pid(uint32_t t) {
     return power + 1;
 }
 
-/* USER CODE END 4 */
-
-/**
- * @brief  This function is executed in case of error occurrence.
- * @retval None
- */
 void Error_Handler(void) {
     /* USER CODE BEGIN Error_Handler_Debug */
     /* User can add his own implementation to report the HAL error return state */
