@@ -22,7 +22,7 @@ static uint16_t clicked_color = BLUE;
 
 #define NUM_ENTRIES 3
 
-const char* menu_entries[NUM_ENTRIES] = { "Curva 1", "Curva 2", "Curva 3" };
+const char* menu_entries[NUM_ENTRIES] = { "Test T", "Test Triac", "?????" };
 
 static inline void write_menu_entry(uint8_t cursor_pos, uint16_t bg_color) {
     uint16_t y = FIRST_ENTRY + BOX_HEIGHT * cursor_pos + MARGIN;
@@ -35,7 +35,7 @@ static inline void fill_menu_entry(uint8_t at, uint16_t color) {
 }
 
 int main(void) {
-    BSP_Init();
+    BSP_init();
 
     AppState current_state = MAIN_MENU;
     AppState next_state = MAIN_MENU;
@@ -54,7 +54,7 @@ int main(void) {
         changed_state = next_state != current_state;
         current_state = next_state;
 
-        BSP_Delay(10);
+        /* BSP_delay(10); */
     }
 }
 
@@ -65,10 +65,13 @@ static AppState main_menu(uint8_t first_entry) {
         BSP_Display_clear(bg_color);
         BSP_Display_write_text("MENU PRINCIPAL", 10, 10, FONT3, RED, WHITE);
 
-        fill_menu_entry(0, highlight_color);
-        write_menu_entry(0, highlight_color);
-        for (uint8_t i = 1; i < NUM_ENTRIES; ++i) {
-            write_menu_entry(i, bg_color);
+        for (uint8_t i = 0; i < NUM_ENTRIES; ++i) {
+            if (i == cursor_pos) {
+                fill_menu_entry(0, highlight_color);
+                write_menu_entry(0, highlight_color);
+            } else {
+                write_menu_entry(i, bg_color);
+            }
         }
     }
 
@@ -86,7 +89,7 @@ static AppState main_menu(uint8_t first_entry) {
     if (BSP_ok_clicked()) {
         fill_menu_entry(cursor_pos, clicked_color);
         write_menu_entry(cursor_pos, clicked_color);
-        /* return (AppState) cursor_pos; */
+        return (AppState) (cursor_pos + 1);
     }
 
     return MAIN_MENU;
@@ -99,13 +102,24 @@ static AppState curve1(uint8_t first_entry) {
         BSP_start_temp_sensor();
     }
 
-    uint32_t t = BSP_get_temp();
-    char buf[4] = {0};
-    sprintf(buf, "T=%d", t);
+    static uint32_t last_t = 0;
+    uint32_t t = BSP_get_temp()[0];
+    char buf[10] = { 0 };
+    if (t != last_t) {
+        static uint32_t last_time = 0;
+        uint32_t time = BSP_millis();
+        sprintf(buf, "dt=%d", time - last_time);
+        last_time = time;
+        BSP_Display_write_text("AAAAAAAAAA", 100, 200, FONT3, bg_color, bg_color);
+        BSP_Display_write_text(buf, 100, 200, FONT3, fg_color, bg_color);
 
-    BSP_Display_write_text(buf, 200, 200, FONT3, fg_color, bg_color);
+        sprintf(buf, "T=%d", t);
+        BSP_Display_write_text("AAAAAAAAAA", 100, 150, FONT3, bg_color, bg_color);
+        BSP_Display_write_text(buf, 100, 150, FONT3, fg_color, bg_color);
+    }
 
     if (BSP_ok_clicked()) {
+        BSP_stop_temp_sensor();
         return MAIN_MENU;
     }
 
@@ -113,15 +127,27 @@ static AppState curve1(uint8_t first_entry) {
 }
 
 static AppState curve2(uint8_t first_entry) {
+    if (first_entry) {
+        BSP_Display_clear(bg_color);
+        BSP_Display_write_text("TEST2 - Disparo de Triac", 10, 10, FONT3, RED, WHITE);
+        BSP_start_temp_sensor();
+        BSP_start_power_step();
+    }
+
+    uint32_t t = BSP_get_temp()[0];
+    BSP_set_power(t);
+
+    if (BSP_ok_clicked()) {
+        BSP_stop_power_step();
+        BSP_stop_temp_sensor();
+        return MAIN_MENU;
+    }
+
     return CURVE2;
 }
 
 static AppState curve3(uint8_t first_entry) {
+    (void) first_entry;
+    Error("curve3 not implemented");
     return CURVE3;
-}
-
-void Error(const char* msg) {
-    BSP_Display_clear(RED);
-    BSP_Display_write_text(msg, 10, 10, FONT3, WHITE, RED);
-    for(;;){}
 }

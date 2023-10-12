@@ -19,8 +19,8 @@
 /* USER CODE END Header */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __BSP_INTERNAL_H
-#define __BSP_INTERNAL_H
+#ifndef __MAIN_H
+#define __MAIN_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,7 +31,6 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "bsp.h"
 
 /* USER CODE END Includes */
 
@@ -55,8 +54,6 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
-void Trigger_Triac(GPIO_TypeDef* port, uint16_t pin);
-void Handle_Zero_Crossing(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -87,9 +84,6 @@ void Handle_Zero_Crossing(void);
 #define BTN_DT_Pin GPIO_PIN_7
 #define BTN_DT_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
-
-#define Triacs_Pins (Triac1_Pin|Triac2_Pin)
-#define Triacs_GPIO_Port GPIOA
 
 /* USER CODE END Private defines */
 

@@ -1,11 +1,15 @@
-#include "ILI9341_GFX.h"
-#include "ILI9341_STM32_Driver.h"
-#include "adc.h"
 #include "bsp.h"
+
+#include "adc.h"
 #include "dma.h"
 #include "gpio.h"
 #include "spi.h"
+#include "stm32f103xb.h"
+#include "stm32f1xx_hal.h"
 #include "stm32f1xx_hal_adc.h"
+#include "stm32f1xx_hal_adc_ex.h"
+#include "stm32f1xx_hal_cortex.h"
+#include "stm32f1xx_hal_gpio.h"
 #include "stm32f1xx_hal_tim.h"
 #include "tim.h"
 
@@ -13,50 +17,50 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define TICK               250
-#define HALF_CYCLE_TIME    10000000 // ps. Duration of a half cycle of the power network at 50Hz
-#define MAX_POWER          4096     // This is due to ADC conversion going from 0 to 4096
-#define UNREACHABLE_PERIOD 0xFFFF
-static const uint32_t MAX_PERIOD = HALF_CYCLE_TIME / TICK;
-static const uint32_t POWER_TO_PERIOD = MAX_PERIOD / MAX_POWER;
-static const uint32_t HALF_POWER = MAX_POWER / 2;
-
-static volatile uint32_t period1 = UNREACHABLE_PERIOD;
-static volatile uint32_t period2 = UNREACHABLE_PERIOD;
-
 static volatile uint8_t ok_clicked = 0;
 
 void SystemClock_Config(void);
 
-static uint32_t pid(uint32_t temp);
 
-static volatile uint32_t t = 0;
-
-void BSP_Init(void) {
+inline void BSP_init(void) {
     HAL_Init();
 
     SystemClock_Config();
 
     MX_GPIO_Init();
     MX_DMA_Init();
+
+    // Triacs
     MX_TIM3_Init();
+
     MX_SPI1_Init();
+
+    // Encoder
     MX_TIM4_Init();
+
+    // TIM1 has a 0.1 s period. At this rate we sample ADC
     MX_TIM1_Init();
     MX_ADC1_Init();
 
-    /* HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1); */
-    /* HAL_ADC_Start_IT(&hadc1); */
+    __HAL_DBGMCU_FREEZE_TIM1();
+    __HAL_DBGMCU_FREEZE_TIM3();
+    __HAL_DBGMCU_FREEZE_TIM4();
 
     BSP_Display_init();
 
     HAL_TIM_Encoder_Start_IT(&htim4, TIM_CHANNEL_ALL);
 
-    __HAL_DBGMCU_FREEZE_TIM1();
+    HAL_ADCEx_Calibration_Start(&hadc1);
+    // Calibration enables adc
+    HAL_ADC_Stop(&hadc1);
 }
 
-void BSP_Delay(uint32_t ms) {
+void BSP_delay(uint32_t ms) {
     HAL_Delay(ms);
+}
+
+uint32_t BSP_millis(void) {
+    return HAL_GetTick();
 }
 
 uint8_t BSP_get_cursor(uint8_t current_cursor) {
@@ -68,39 +72,6 @@ uint8_t BSP_ok_clicked(void) {
     uint8_t temp = ok_clicked;
     ok_clicked = 0;
     return temp;
-}
-
-void BSP_start_temp_sensor(void) {
-    HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
-    HAL_ADC_Start_IT(&hadc1);
-}
-
-uint32_t BSP_get_temp(void) {
-    return t;
-}
-
-void BSP_start_power_step(void) {
-    HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
-    HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_2);
-    HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_3);
-}
-
-void BSP_stop_power_step(void) {
-    HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_1);
-    HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_2);
-    HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_3);
-}
-
-void BSP_set_power(uint32_t power) {
-    {
-        uint32_t power1 = power > HALF_POWER ? MAX_POWER : power * 2;
-        period1 = (MAX_POWER - power1) * POWER_TO_PERIOD;
-    }
-
-    {
-        uint32_t power2 = power >= HALF_POWER ? (power - HALF_POWER) * 2 : 0;
-        period2 = (MAX_POWER - power2) * POWER_TO_PERIOD;
-    }
 }
 
 /**
@@ -144,11 +115,7 @@ void SystemClock_Config(void) {
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     switch (GPIO_Pin) {
         case ZC_Pin: {
-            __disable_irq();
-            TIM3->CNT = 0x0;
-            TIM3->CCR1 = period1;
-            TIM3->CCR2 = period2;
-            __enable_irq();
+            BSP_Power_ZC_interrupt();
             break;
         }
         case Ok_Pin: {
@@ -172,10 +139,10 @@ void Trigger_Triac(GPIO_TypeDef* port, uint16_t pin) {
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim) {
     __disable_irq();
     if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) {
-        htim->Instance->CCR1 = UNREACHABLE_PERIOD;
+        /* htim->Instance->CCR1 = UNREACHABLE_PERIOD; */
         Trigger_Triac(Triac1_GPIO_Port, Triac1_Pin);
     } else if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2) {
-        htim->Instance->CCR2 = UNREACHABLE_PERIOD;
+        /* htim->Instance->CCR2 = UNREACHABLE_PERIOD; */
         Trigger_Triac(Triac2_GPIO_Port, Triac2_Pin);
     } else if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3) {
         // If we get here it's an error
@@ -185,31 +152,23 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim) {
         HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_3);
 
         HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-        Error("404: Red de alimentacion not found!");
+        Error("404: 220V not found!");
     } else {
         __NOP();
     }
     __enable_irq();
 }
 
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
-    t = HAL_ADC_GetValue(hadc);
-}
-
-static uint32_t pid(uint32_t t) {
-    return t;
-}
 
 __weak void Error(const char* msg) {
-    Error_Handler();
+    BSP_Display_clear(RED);
+    BSP_Display_write_text(msg, 0, 0, FONT3, WHITE, RED);
+    __disable_irq();
+    while (1) {}
 }
 
 void Error_Handler() {
-    /* USER CODE BEGIN Error_Handler_Debug */
-    /* User can add his own implementation to report the HAL error return state */
-    __disable_irq();
-    while (1) {}
-    /* USER CODE END Error_Handler_Debug */
+    Error("System error");
 }
 
 #ifdef USE_FULL_ASSERT
