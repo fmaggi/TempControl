@@ -29,10 +29,10 @@ void BSP_Power_init(void) {
 }
 
 void BSP_Power_start(void) {
+    HAL_NVIC_EnableIRQ(ZC_EXTI_IRQn);
     HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
     HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_2);
     HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_3);
-    HAL_NVIC_EnableIRQ(ZC_EXTI_IRQn);
 }
 
 void BSP_Power_stop(void) {

@@ -1,5 +1,7 @@
 #include "app_state.h"
 #include "bsp.h"
+#include "display.h"
+#include "io.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -61,13 +63,14 @@ static AppState main_menu(uint8_t first_entry) {
     static uint8_t cursor_pos = 0;
 
     if (first_entry) {
+        cursor_pos = BSP_IO_get_cursor(cursor_pos);
         BSP_Display_clear(bg_color);
         BSP_Display_write_text("MENU PRINCIPAL", 10, 10, FONT3, RED, WHITE);
 
         for (uint8_t i = 0; i < NUM_ENTRIES; ++i) {
             if (i == cursor_pos) {
-                fill_menu_entry(0, highlight_color);
-                write_menu_entry(0, highlight_color);
+                fill_menu_entry(i, highlight_color);
+                write_menu_entry(i, highlight_color);
             } else {
                 write_menu_entry(i, bg_color);
             }
@@ -103,7 +106,7 @@ static AppState curve1(uint8_t first_entry) {
 
     static uint32_t last_t = 0;
     uint32_t t = BSP_T_get()[0];
-    char buf[10] = { 0 };
+    char buf[15] = { 0 };
     if (t != last_t) {
         static uint32_t last_time = 0;
         uint32_t time = BSP_millis();
@@ -112,10 +115,21 @@ static AppState curve1(uint8_t first_entry) {
         BSP_Display_write_text("AAAAAAAAAA", 100, 200, FONT3, bg_color, bg_color);
         BSP_Display_write_text(buf, 100, 200, FONT3, fg_color, bg_color);
 
+        last_t = t;
         sprintf(buf, "T=%d", t);
         BSP_Display_write_text("AAAAAAAAAA", 100, 150, FONT3, bg_color, bg_color);
         BSP_Display_write_text(buf, 100, 150, FONT3, fg_color, bg_color);
     }
+
+    static uint32_t last_rot = 0xFFFF;
+    uint32_t rot = BSP_IO_get_rotary(25, 150);
+    if (rot != last_rot) {
+        last_rot = rot;
+        sprintf(buf, "R=%d", rot);
+        BSP_Display_write_text("AAAAAAAAAAA", 100, 100, FONT3, bg_color,bg_color);
+        BSP_Display_write_text(buf, 100, 100, FONT3, fg_color, bg_color);
+    }
+
 
     if (BSP_IO_ok_clicked()) {
         BSP_T_stop();

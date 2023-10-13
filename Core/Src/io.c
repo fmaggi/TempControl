@@ -1,6 +1,7 @@
 #include "io.h"
 
 #include "bsp_internal.h"
+#include "app_state.h"
 
 TIM_HandleTypeDef htim4;
 #define IO_TIM            TIM4
@@ -22,7 +23,7 @@ void BSP_IO_init(void) {
 
 uint8_t BSP_IO_get_cursor(uint8_t current_cursor) {
     (void) current_cursor;
-    return (uint8_t) IO_TIM->CNT;
+    return (uint8_t) ((IO_TIM->CNT>>2) % LAST_STATE);
 }
 
 void BSP_IO_Ok_interrupt(void) {
@@ -33,6 +34,21 @@ uint8_t BSP_IO_ok_clicked(void) {
     uint8_t temp = ok_clicked;
     ok_clicked = 0;
     return temp;
+}
+
+uint32_t BSP_IO_get_rotary(uint32_t min_value, uint32_t max_value) {
+    uint32_t cnt = IO_TIM->CNT >> 2;
+    if (cnt <= min_value) {
+        IO_TIM->CNT = min_value << 2;
+        return min_value;
+    }
+
+    if (cnt >= max_value) {
+        IO_TIM->CNT = max_value << 2;
+        return max_value;
+    }
+
+    return cnt;
 }
 
 static void GPIO_init(void) {
@@ -65,7 +81,7 @@ static void TIM_init(void) {
     htim4.Instance = IO_TIM;
     htim4.Init.Prescaler = 0;
     htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-    htim4.Init.Period = 2;
+    htim4.Init.Period = 0xFFFF;
     htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
