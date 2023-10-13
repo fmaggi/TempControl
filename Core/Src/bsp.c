@@ -1,7 +1,6 @@
 #include "bsp.h"
 
 #include "bsp_internal.h"
-#include "gpio.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -13,7 +12,7 @@ void BSP_init(void) {
 
     SystemClock_Config();
 
-    MX_GPIO_Init();
+    /* MX_GPIO_Init(); */
     BSP_Power_init();
     BSP_T_init();
     BSP_Display_init();

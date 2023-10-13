@@ -8,6 +8,9 @@
 
 void Error(const char* msg);
 
+SPI_HandleTypeDef hspi1;
+#define SPI_Instance SPI1
+
 #define LCD_LED_Pin       GPIO_PIN_0
 #define LCD_LED_GPIO_Port GPIOB
 #define LCD_RST_Pin       GPIO_PIN_1
@@ -17,11 +20,13 @@ void Error(const char* msg);
 #define LCD_CS_Pin        GPIO_PIN_11
 #define LCD_CS_GPIO_Port  GPIOB
 
-static void init_gpio(void);
-static void init_spi(void);
+static void GPIO_init(void);
+static void SPI_init(void);
 
 void BSP_Display_init(void) {
-    MX_SPI1_Init();
+    GPIO_init();
+    SPI_init();
+    /* MX_SPI1_Init(); */
     ILI9341_Init();
 }
 
@@ -37,12 +42,11 @@ void BSP_Display_write_text(const char* s, uint16_t x, uint16_t y, const uint8_t
     ILI9341_DrawText(s, font, x, y, fg_color, bg_color);
 }
 
-static void init_gpio(void) {
+static void GPIO_init(void) {
     __HAL_RCC_GPIOB_CLK_ENABLE();
     HAL_GPIO_WritePin(GPIOB, LCD_LED_Pin | LCD_RST_Pin | LCD_DC_Pin | LCD_CS_Pin, GPIO_PIN_RESET);
-
     GPIO_InitTypeDef GPIO_InitStruct = { 0 };
-    /*Configure GPIO pins : PBPin PBPin PBPin PBPin */
+
     GPIO_InitStruct.Pin = LCD_LED_Pin | LCD_RST_Pin | LCD_DC_Pin | LCD_CS_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
@@ -50,8 +54,8 @@ static void init_gpio(void) {
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 }
 
-static void init_spi(void) {
-    hspi1.Instance = SPI1;
+static void SPI_init(void) {
+    hspi1.Instance = SPI_Instance;
     hspi1.Init.Mode = SPI_MODE_MASTER;
     hspi1.Init.Direction = SPI_DIRECTION_2LINES;
     hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
@@ -64,7 +68,6 @@ static void init_spi(void) {
     hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
     hspi1.Init.CRCPolynomial = 10;
     if (HAL_SPI_Init(&hspi1) != HAL_OK) {
-        Error("Display: Failed to init SPI");
+        Error_Handler();
     }
 }
-

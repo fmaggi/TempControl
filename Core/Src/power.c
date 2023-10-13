@@ -1,15 +1,19 @@
 #include "power.h"
 
+#include "bsp.h"
 #include "tim.h"
 
-#define ZC_Pin GPIO_PIN_1
-#define ZC_GPIO_Port GPIOA
-#define ZC_EXTI_IRQn EXTI1_IRQn
-#define Triac1_Pin GPIO_PIN_3
+void Error(const char* msg);
+
+#define ZC_Pin           GPIO_PIN_1
+#define ZC_GPIO_Port     GPIOA
+#define ZC_EXTI_IRQn     EXTI1_IRQn
+#define Triac1_Pin       GPIO_PIN_3
 #define Triac1_GPIO_Port GPIOA
-#define Triac2_Pin GPIO_PIN_4
+#define Triac2_Pin       GPIO_PIN_4
 #define Triac2_GPIO_Port GPIOA
 
+TIM_HandleTypeDef htim3;
 #define P_TIM          TIM3
 #define TIM_FREEZE_DBG __HAL_DBGMCU_FREEZE_TIM3
 
@@ -25,8 +29,13 @@ static const uint32_t HALF_POWER = MAX_POWER / 2;
 static volatile uint32_t period1 = UNREACHABLE_PERIOD;
 static volatile uint32_t period2 = UNREACHABLE_PERIOD;
 
+static void TIM_init(void);
+static void GPIO_init(void);
+
 void BSP_Power_init(void) {
-    MX_TIM3_Init();
+    GPIO_init();
+    TIM_init();
+    /* MX_TIM3_Init(); */
     TIM_FREEZE_DBG();
 }
 
@@ -95,4 +104,68 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim) {
         __NOP();
     }
     __enable_irq();
+}
+
+static void TIM_init(void) {
+    TIM_ClockConfigTypeDef sClockSourceConfig = { 0 };
+    TIM_MasterConfigTypeDef sMasterConfig = { 0 };
+    TIM_OC_InitTypeDef sConfigOC = { 0 };
+
+    htim3.Instance = P_TIM;
+    htim3.Init.Prescaler = 1;
+    htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim3.Init.Period = 0xffff;
+    htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+    if (HAL_TIM_Base_Init(&htim3) != HAL_OK) {
+        Error_Handler();
+    }
+    sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+    if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK) {
+        Error_Handler();
+    }
+    if (HAL_TIM_OC_Init(&htim3) != HAL_OK) {
+        Error_Handler();
+    }
+    sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+    sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+    if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK) {
+        Error_Handler();
+    }
+    sConfigOC.OCMode = TIM_OCMODE_TIMING;
+    sConfigOC.Pulse = 0xffff;
+    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+    if (HAL_TIM_OC_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK) {
+        Error_Handler();
+    }
+    if (HAL_TIM_OC_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK) {
+        Error_Handler();
+    }
+    sConfigOC.Pulse = 0xfff0;
+    if (HAL_TIM_OC_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_3) != HAL_OK) {
+        Error_Handler();
+    }
+}
+
+static void GPIO_init(void) {
+    GPIO_InitTypeDef GPIO_InitStruct = { 0 };
+
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    HAL_GPIO_WritePin(GPIOA, Triac1_Pin | Triac2_Pin, GPIO_PIN_RESET);
+
+    GPIO_InitStruct.Pin = ZC_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(ZC_GPIO_Port, &GPIO_InitStruct);
+
+    /*Configure GPIO pins : PAPin PAPin */
+    GPIO_InitStruct.Pin = Triac1_Pin | Triac2_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    HAL_NVIC_SetPriority(ZC_EXTI_IRQn, 0, 0);
 }
