@@ -19,7 +19,7 @@ uint32_t BSP_millis(void);
 uint8_t BSP_get_cursor(uint8_t current_cursor);
 uint8_t BSP_ok_clicked(void);
 
-void Error(const char* msg);
+void Error_Handler(const char* msg);
 
 #ifdef __cplusplus
 }

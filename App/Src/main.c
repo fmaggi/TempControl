@@ -1,7 +1,5 @@
 #include "app_state.h"
 #include "bsp.h"
-#include "display.h"
-#include "temperature.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -149,6 +147,6 @@ static AppState curve2(uint8_t first_entry) {
 
 static AppState curve3(uint8_t first_entry) {
     (void) first_entry;
-    Error("curve3 not implemented");
+    Error_Handler("curve3 not implemented");
     return CURVE3;
 }

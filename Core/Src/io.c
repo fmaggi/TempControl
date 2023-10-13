@@ -1,18 +1,10 @@
 #include "io.h"
 
-#include "tim.h"
+#include "bsp_internal.h"
 
 TIM_HandleTypeDef htim4;
 #define IO_TIM            TIM4
 #define IO_TIM_FREEZE_DBG __HAL_DBGMCU_FREEZE_TIM4
-
-#define Ok_Pin            GPIO_PIN_14
-#define Ok_GPIO_Port      GPIOB
-#define Ok_EXTI_IRQn      EXTI15_10_IRQn
-#define BTN_CLK_Pin       GPIO_PIN_6
-#define BTN_CLK_GPIO_Port GPIOB
-#define BTN_DT_Pin        GPIO_PIN_7
-#define BTN_DT_GPIO_Port  GPIOB
 
 static volatile uint8_t ok_clicked = 0;
 
@@ -22,7 +14,6 @@ static void TIM_init(void);
 void BSP_IO_init(void) {
     GPIO_init();
     TIM_init();
-    /* MX_TIM4_Init(); */
 
     IO_TIM_FREEZE_DBG();
 
@@ -71,9 +62,6 @@ static void TIM_init(void) {
     TIM_Encoder_InitTypeDef sConfig = { 0 };
     TIM_MasterConfigTypeDef sMasterConfig = { 0 };
 
-    /* USER CODE BEGIN TIM4_Init 1 */
-
-    /* USER CODE END TIM4_Init 1 */
     htim4.Instance = IO_TIM;
     htim4.Init.Prescaler = 0;
     htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
@@ -90,11 +78,11 @@ static void TIM_init(void) {
     sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
     sConfig.IC2Filter = 0;
     if (HAL_TIM_Encoder_Init(&htim4, &sConfig) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("IO: Failed to init TIM");
     }
     sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
     sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
     if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("IO: Failed to init TIM");
     }
 }

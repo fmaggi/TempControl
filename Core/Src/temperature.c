@@ -1,7 +1,7 @@
 #include "temperature.h"
 
-#include "adc.h"
-#include "tim.h"
+#include "bsp_internal.h"
+#include "stm32f1xx_hal_rcc.h"
 
 ADC_HandleTypeDef hadc1;
 #define ADC_Instance ADC1
@@ -17,14 +17,12 @@ TIM_HandleTypeDef htim1;
 
 static volatile uint32_t t[T_NUM] = { 0 };
 
-static void TIM_init(void);
+static void TIM_init(uint32_t sample_period);
 static void ADC_init(void);
 
-void BSP_T_init() {
-    TIM_init();
+void BSP_T_init(uint32_t sample_period_us) {
+    TIM_init(sample_period_us);
     ADC_init();
-    /* MX_TIM1_Init(); */
-    /* MX_ADC1_Init(); */
     ADC_TIM_FREEZE_DBG();
 
     HAL_ADCEx_Calibration_Start(&hadc1);
@@ -53,46 +51,51 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
     t[0] = HAL_ADC_GetValue(hadc);
 }
 
-static void TIM_init(void) {
+static void TIM_init(uint32_t sample_period) {
     TIM_ClockConfigTypeDef sClockSourceConfig = { 0 };
     TIM_MasterConfigTypeDef sMasterConfig = { 0 };
     TIM_OC_InitTypeDef sConfigOC = { 0 };
     TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = { 0 };
 
-    /* USER CODE BEGIN TIM1_Init 1 */
+    if (sample_period < TICK) {
+        Error_Handler("T: Failed to init TIM");
+    }
 
-    /* USER CODE END TIM1_Init 1 */
+    uint32_t prescaler = HAL_RCC_GetSysClockFreq() / FREQ;
+    uint32_t period = sample_period / TICK;
+
     htim1.Instance = ADC_TIM;
-    htim1.Init.Prescaler = 799;
+    htim1.Init.Prescaler = prescaler - 1;
     htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-    htim1.Init.Period = 10000;
+    htim1.Init.Period = period + 1;
     htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     htim1.Init.RepetitionCounter = 0;
     htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     if (HAL_TIM_Base_Init(&htim1) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("T: Failed to init TIM");
     }
     sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
     if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("T: Failed to init TIM");
     }
     if (HAL_TIM_PWM_Init(&htim1) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("T: Failed to init TIM");
     }
     sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
     sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
     if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("T: Failed to init TIM");
     }
+
     sConfigOC.OCMode = TIM_OCMODE_PWM1;
-    sConfigOC.Pulse = 10000;
+    sConfigOC.Pulse = period;
     sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
     sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
     sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
     sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
     sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
     if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("T: Failed to init TIM");
     }
     sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
     sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
@@ -102,7 +105,7 @@ static void TIM_init(void) {
     sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
     sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
     if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("T: Failed to init TIM");
     }
 }
 
@@ -117,7 +120,7 @@ static void ADC_init(void) {
     hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
     hadc1.Init.NbrOfConversion = 1;
     if (HAL_ADC_Init(&hadc1) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("T: Failed to init ADC");
     }
 
     /** Configure Regular Channel
@@ -126,6 +129,6 @@ static void ADC_init(void) {
     sConfig.Rank = ADC_REGULAR_RANK_1;
     sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
     if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("T: Failed to init ADC");
     }
 }

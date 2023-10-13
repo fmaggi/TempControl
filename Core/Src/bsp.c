@@ -12,10 +12,9 @@ void BSP_init(void) {
 
     SystemClock_Config();
 
-    /* MX_GPIO_Init(); */
-    BSP_Power_init();
-    BSP_T_init();
     BSP_Display_init();
+    BSP_Power_init();
+    BSP_T_init(100000);
     BSP_IO_init();
 }
 
@@ -44,7 +43,7 @@ void SystemClock_Config(void) {
     RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
-        Error("BSP: Failed to init HSI");
+        Error_Handler("BSP: Failed to init HSI");
     }
 
     /** Initializes the CPU, AHB and APB buses clocks
@@ -56,13 +55,13 @@ void SystemClock_Config(void) {
     RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
     if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK) {
-        Error("BSP: Failed to init clocks");
+        Error_Handler("BSP: Failed to init clocks");
     }
 
     PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
     PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV2;
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK) {
-        Error("BSP: Failed to init clocks");
+        Error_Handler("BSP: Failed to init clocks");
     }
 }
 
@@ -80,15 +79,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     }
 }
 
-__weak void Error(const char* msg) {
+__weak void Error_Handler(const char* msg) {
     BSP_Display_clear(RED);
     BSP_Display_write_text(msg, 0, 0, FONT3, WHITE, RED);
     __disable_irq();
     while (1) {}
-}
-
-void Error_Handler() {
-    Error("System error");
 }
 
 #ifdef USE_FULL_ASSERT

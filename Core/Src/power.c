@@ -1,17 +1,7 @@
 #include "power.h"
 
-#include "bsp.h"
-#include "tim.h"
-
-void Error(const char* msg);
-
-#define ZC_Pin           GPIO_PIN_1
-#define ZC_GPIO_Port     GPIOA
-#define ZC_EXTI_IRQn     EXTI1_IRQn
-#define Triac1_Pin       GPIO_PIN_3
-#define Triac1_GPIO_Port GPIOA
-#define Triac2_Pin       GPIO_PIN_4
-#define Triac2_GPIO_Port GPIOA
+#include "bsp_internal.h"
+#include "stm32f1xx_hal_rcc.h"
 
 TIM_HandleTypeDef htim3;
 #define P_TIM          TIM3
@@ -35,7 +25,6 @@ static void GPIO_init(void);
 void BSP_Power_init(void) {
     GPIO_init();
     TIM_init();
-    /* MX_TIM3_Init(); */
     TIM_FREEZE_DBG();
 }
 
@@ -67,9 +56,9 @@ void BSP_Power_set(uint32_t power) {
 
 void BSP_Power_ZC_interrupt(void) {
     __disable_irq();
-    TIM3->CNT = 0x0;
-    TIM3->CCR1 = period1;
-    TIM3->CCR2 = period2;
+    P_TIM->CNT = 0x0;
+    P_TIM->CCR1 = period1;
+    P_TIM->CCR2 = period2;
     __enable_irq();
 }
 
@@ -99,7 +88,7 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim) {
         HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_3);
 
         HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-        Error("404: 220V not found!");
+        Error_Handler("404: 220V not found!");
     } else {
         __NOP();
     }
@@ -111,40 +100,42 @@ static void TIM_init(void) {
     TIM_MasterConfigTypeDef sMasterConfig = { 0 };
     TIM_OC_InitTypeDef sConfigOC = { 0 };
 
+    uint32_t prescaler = HAL_RCC_GetSysClockFreq() / FREQ;
+
     htim3.Instance = P_TIM;
-    htim3.Init.Prescaler = 1;
+    htim3.Init.Prescaler = prescaler - 1;
     htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
     htim3.Init.Period = 0xffff;
     htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
     if (HAL_TIM_Base_Init(&htim3) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("PWR: Failed to init TIM");
     }
     sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
     if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("PWR: Failed to init TIM");
     }
     if (HAL_TIM_OC_Init(&htim3) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("PWR: Failed to init TIM");
     }
     sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
     sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
     if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("PWR: Failed to init TIM");
     }
     sConfigOC.OCMode = TIM_OCMODE_TIMING;
     sConfigOC.Pulse = 0xffff;
     sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
     sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
     if (HAL_TIM_OC_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("PWR: Failed to init TIM");
     }
     if (HAL_TIM_OC_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("PWR: Failed to init TIM");
     }
     sConfigOC.Pulse = 0xfff0;
     if (HAL_TIM_OC_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_3) != HAL_OK) {
-        Error_Handler();
+        Error_Handler("PWR: Failed to init TIM");
     }
 }
 

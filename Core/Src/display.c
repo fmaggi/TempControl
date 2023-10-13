@@ -2,23 +2,10 @@
 
 #include "ILI9341_GFX.h"
 #include "ILI9341_STM32_Driver.h"
-#include "spi.h"
-#include "stm32f1xx_hal.h"
-#include "stm32f1xx_hal_spi.h"
-
-void Error(const char* msg);
+#include "bsp_internal.h"
 
 SPI_HandleTypeDef hspi1;
 #define SPI_Instance SPI1
-
-#define LCD_LED_Pin       GPIO_PIN_0
-#define LCD_LED_GPIO_Port GPIOB
-#define LCD_RST_Pin       GPIO_PIN_1
-#define LCD_RST_GPIO_Port GPIOB
-#define LCD_DC_Pin        GPIO_PIN_10
-#define LCD_DC_GPIO_Port  GPIOB
-#define LCD_CS_Pin        GPIO_PIN_11
-#define LCD_CS_GPIO_Port  GPIOB
 
 static void GPIO_init(void);
 static void SPI_init(void);
@@ -26,7 +13,6 @@ static void SPI_init(void);
 void BSP_Display_init(void) {
     GPIO_init();
     SPI_init();
-    /* MX_SPI1_Init(); */
     ILI9341_Init();
 }
 
@@ -68,6 +54,7 @@ static void SPI_init(void) {
     hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
     hspi1.Init.CRCPolynomial = 10;
     if (HAL_SPI_Init(&hspi1) != HAL_OK) {
-        Error_Handler();
+        // We dont have a display to write a message to, so it wont show
+        Error_Handler("DSP: Failed to init SPI");
     }
 }
