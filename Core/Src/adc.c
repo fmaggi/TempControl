@@ -18,7 +18,7 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include "adc.h"
+#include "bsp_internal.h"
 
 /* USER CODE BEGIN 0 */
 

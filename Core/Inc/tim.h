@@ -26,7 +26,7 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include <bsp_internal.h>
+#include "bsp_internal.h"
 
 /* USER CODE BEGIN Includes */
 

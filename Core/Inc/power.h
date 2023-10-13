@@ -7,6 +7,7 @@ extern "C" {
 
 #include <stdint.h>
 
+void BSP_Power_init(void);
 void BSP_Power_start(void);
 void BSP_Power_stop(void);
 void BSP_Power_set(uint32_t power);

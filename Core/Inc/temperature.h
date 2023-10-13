@@ -8,9 +8,10 @@ extern "C" {
 #include <stdint.h>
 
 #define T_NUM 5
-void BSP_start_temp_sensor(void);
-void BSP_stop_temp_sensor(void);
-volatile uint32_t* BSP_get_temp(void);
+void BSP_T_init();
+void BSP_T_start(void);
+void BSP_T_stop(void);
+volatile uint32_t* BSP_T_get(void);
 
 #ifdef __cplusplus
 }

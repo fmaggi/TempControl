@@ -19,7 +19,7 @@
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
-#include <bsp_internal.h>
+#include "bsp_internal.h"
 /* USER CODE BEGIN Includes */
 
 /* USER CODE END Includes */
