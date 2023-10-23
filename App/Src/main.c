@@ -126,10 +126,9 @@ static AppState curve1(uint8_t first_entry) {
     if (rot != last_rot) {
         last_rot = rot;
         sprintf(buf, "R=%d", rot);
-        BSP_Display_write_text("AAAAAAAAAAA", 100, 100, FONT3, bg_color,bg_color);
+        BSP_Display_write_text("AAAAAAAAAAA", 100, 100, FONT3, bg_color, bg_color);
         BSP_Display_write_text(buf, 100, 100, FONT3, fg_color, bg_color);
     }
-
 
     if (BSP_IO_ok_clicked()) {
         BSP_T_stop();
@@ -147,7 +146,15 @@ static AppState curve2(uint8_t first_entry) {
         BSP_Power_start();
     }
 
+    static uint32_t last_t = 0;
     uint32_t t = BSP_T_get()[0];
+    if (t != last_t) {
+        char buf[15] = { 0 };
+        sprintf(buf, "T=%d", t);
+        BSP_Display_write_text("AAAAAAAAAA", 100, 150, FONT3, bg_color, bg_color);
+        BSP_Display_write_text(buf, 100, 150, FONT3, fg_color, bg_color);
+        last_t = t;
+    }
     BSP_Power_set(t);
 
     if (BSP_IO_ok_clicked()) {

@@ -13,14 +13,6 @@ typedef enum {
 	LAST_STATE = CURVE3
 } AppState;
 
-typedef AppState(*StateHandlerFn)(void);
-typedef void(*OnEnterStateFn)(void);
-
-typedef struct {
-    OnEnterStateFn on_enter;
-    StateHandlerFn state_handler;
-} StateHandler;
-
 #ifdef __cplusplus
 }
 #endif

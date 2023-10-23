@@ -2,15 +2,17 @@
 
 #include "bsp_internal.h"
 #include "stm32f1xx_hal_rcc.h"
+#include "stm32f1xx_hal_tim.h"
 
 TIM_HandleTypeDef htim3;
 #define P_TIM          TIM3
 #define TIM_FREEZE_DBG __HAL_DBGMCU_FREEZE_TIM3
+#define P_TIM_IRQn     TIM3_IRQn
 
 #define FREQ               4000000
 #define TICK               250      // ps
 #define HALF_CYCLE_TIME    10000000 // ps. Duration of a half cycle of the power network at 50Hz
-#define MAX_POWER          4096     // This is due to ADC conversion going from 0 to 4096
+#define MAX_POWER          100     // This is due to ADC conversion going from 0 to 4096
 #define UNREACHABLE_PERIOD 0xFFFF
 static const uint32_t MAX_PERIOD = HALF_CYCLE_TIME / TICK;
 static const uint32_t POWER_TO_PERIOD = MAX_PERIOD / MAX_POWER;
@@ -26,10 +28,13 @@ void BSP_Power_init(void) {
     GPIO_init();
     TIM_init();
     TIM_FREEZE_DBG();
+    HAL_GPIO_WritePin(Triac1_GPIO_Port, Triac1_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(Triac2_GPIO_Port, Triac2_Pin, GPIO_PIN_SET);
 }
 
 void BSP_Power_start(void) {
     HAL_NVIC_EnableIRQ(ZC_EXTI_IRQn);
+    HAL_NVIC_EnableIRQ(P_TIM_IRQn);
     HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
     HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_2);
     HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_3);
@@ -37,6 +42,9 @@ void BSP_Power_start(void) {
 
 void BSP_Power_stop(void) {
     HAL_NVIC_DisableIRQ(ZC_EXTI_IRQn);
+    HAL_NVIC_DisableIRQ(P_TIM_IRQn);
+    period1 = UNREACHABLE_PERIOD;
+    period2 = UNREACHABLE_PERIOD;
     HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_1);
     HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_2);
     HAL_TIM_OC_Stop_IT(&htim3, TIM_CHANNEL_3);
@@ -63,13 +71,13 @@ void BSP_Power_ZC_interrupt(void) {
 }
 
 void Trigger_Triac(GPIO_TypeDef* port, uint16_t pin) {
-    HAL_GPIO_WritePin(port, pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(port, pin, GPIO_PIN_RESET);
 
     // HACK: this should be around 5 us at 8 MHz (measured it)
     for (int i = 0; i < 5; ++i)
         ;
 
-    HAL_GPIO_WritePin(port, pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(port, pin, GPIO_PIN_SET);
 }
 
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim) {

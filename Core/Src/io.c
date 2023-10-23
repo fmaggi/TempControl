@@ -1,11 +1,14 @@
 #include "io.h"
 
-#include "bsp_internal.h"
 #include "app_state.h"
+#include "bsp_internal.h"
+#include "stm32f1xx_hal.h"
 
 TIM_HandleTypeDef htim4;
 #define IO_TIM            TIM4
 #define IO_TIM_FREEZE_DBG __HAL_DBGMCU_FREEZE_TIM4
+
+#define DEBOUNCE 50
 
 static volatile uint8_t ok_clicked = 0;
 
@@ -23,11 +26,16 @@ void BSP_IO_init(void) {
 
 uint8_t BSP_IO_get_cursor(uint8_t current_cursor) {
     (void) current_cursor;
-    return (uint8_t) ((IO_TIM->CNT>>2) % LAST_STATE);
+    return (uint8_t) ((IO_TIM->CNT >> 2) % LAST_STATE);
 }
 
 void BSP_IO_Ok_interrupt(void) {
-    ok_clicked = 1;
+    static uint32_t last_t = 0;
+    uint32_t t = HAL_GetTick();
+    if (t > last_t + DEBOUNCE) {
+        last_t = t;
+        ok_clicked = 1;
+    }
 }
 
 uint8_t BSP_IO_ok_clicked(void) {
