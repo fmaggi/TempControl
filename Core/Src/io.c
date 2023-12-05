@@ -1,6 +1,5 @@
 #include "io.h"
 
-#include "app_state.h"
 #include "bsp_internal.h"
 #include "stm32f1xx_hal.h"
 
@@ -24,9 +23,9 @@ void BSP_IO_init(void) {
     HAL_TIM_Encoder_Start_IT(&htim4, TIM_CHANNEL_ALL);
 }
 
-uint8_t BSP_IO_get_cursor(uint8_t current_cursor) {
+uint8_t BSP_IO_get_cursor(uint8_t current_cursor, uint8_t num_positions) {
     (void) current_cursor;
-    return (uint8_t) ((IO_TIM->CNT >> 2) % LAST_STATE);
+    return (uint8_t) ((IO_TIM->CNT >> 2) % num_positions);
 }
 
 void BSP_IO_Ok_interrupt(void) {
@@ -46,17 +45,21 @@ uint8_t BSP_IO_ok_clicked(void) {
 
 uint32_t BSP_IO_get_rotary(uint32_t min_value, uint32_t max_value) {
     uint32_t cnt = IO_TIM->CNT >> 2;
-    if (cnt <= min_value) {
+    if (cnt < min_value+1) {
         IO_TIM->CNT = min_value << 2;
         return min_value;
     }
 
-    if (cnt >= max_value) {
+    if (cnt > max_value-1) {
         IO_TIM->CNT = max_value << 2;
         return max_value;
     }
 
     return cnt;
+}
+
+void BSP_IO_set_rotary(uint32_t v) {
+    IO_TIM->CNT = v << 2;
 }
 
 static void GPIO_init(void) {
@@ -78,8 +81,8 @@ static void GPIO_init(void) {
     GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(Ok_GPIO_Port, &GPIO_InitStruct);
 
-    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+    HAL_NVIC_SetPriority(Ok_EXTI_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(Ok_EXTI_IRQn);
 }
 
 static void TIM_init(void) {

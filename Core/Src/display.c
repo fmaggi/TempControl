@@ -3,6 +3,7 @@
 #include "ILI9341_GFX.h"
 #include "ILI9341_STM32_Driver.h"
 #include "bsp_internal.h"
+#include "stm32f1xx_hal_gpio.h"
 
 SPI_HandleTypeDef hspi1;
 #define SPI_Instance SPI1
@@ -13,6 +14,7 @@ static void SPI_init(void);
 void BSP_Display_init(void) {
     GPIO_init();
     SPI_init();
+    HAL_GPIO_WritePin(LCD_LED_GPIO_Port, LCD_LED_Pin, GPIO_PIN_SET);
     ILI9341_Init();
 }
 

@@ -7,9 +7,20 @@ extern "C" {
 
 #include <stdint.h>
 
+#define MAX_POWER 100
+
+struct PowerState {
+    uint32_t power;
+    uint32_t period1;
+    uint32_t period2;
+};
+
 void BSP_Power_init(void);
 void BSP_Power_start(void);
 void BSP_Power_stop(void);
+
+struct PowerState BSP_Power_get(void);
+void BSP_Power_delta(int32_t d);
 void BSP_Power_set(uint32_t power);
 
 void BSP_Power_ZC_interrupt(void);

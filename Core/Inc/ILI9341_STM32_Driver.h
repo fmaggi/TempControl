@@ -1,13 +1,7 @@
 #ifndef ILI9341_STM32_DRIVER_H
 #define ILI9341_STM32_DRIVER_H
 
-#ifdef STM32F103xB
-    #include "stm32f1xx_hal.h"
-#else
-    #error "No HAL included"
-#endif
-
-extern SPI_HandleTypeDef hspi1;
+#include <stdint.h>
 
 #define ILI9341_SCREEN_HEIGHT 	240
 #define ILI9341_SCREEN_WIDTH 	320
@@ -15,14 +9,6 @@ extern SPI_HandleTypeDef hspi1;
 /* PIN Configuration */
 // This should probably be a config struct
 // Then it should be passed to the init function
-#define HSPI_INSTANCE			&hspi1
-#define LCD_CS_PORT				GPIOB
-#define LCD_CS_PIN				GPIO_PIN_11
-#define LCD_DC_PORT				GPIOB
-#define LCD_DC_PIN				GPIO_PIN_10
-#define	LCD_RST_PORT			GPIOB
-#define	LCD_RST_PIN				GPIO_PIN_1
-
 #define BURST_MAX_SIZE 			500
 #define BLACK      				0x0000
 #define NAVY        			0x000F

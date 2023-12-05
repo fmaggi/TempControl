@@ -14,7 +14,7 @@ void BSP_init(void) {
 
     BSP_Display_init();
     BSP_Power_init();
-    BSP_T_init(100000);
+    BSP_T_init(100); // sample every 100 ms
     BSP_IO_init();
 }
 

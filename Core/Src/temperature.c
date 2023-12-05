@@ -11,23 +11,27 @@ TIM_HandleTypeDef htim1;
 #define ADC_TIM            TIM1
 #define ADC_TIM_FREEZE_DBG __HAL_DBGMCU_FREEZE_TIM1
 
-#define FREQ        10000 // Hz
-#define TICK        100   // us
-#define T_Pin       GPIO_PIN_0
-#define T_GPIO_Port GPIOA
+#define T_NUM 8 // needs to be a power of 2
 
-#define MAX_V 3300000 // uV
+#define FREQ 100000 // Hz
+#define TICK 10     // us
+
+#define MAX_V   3300000 // uV
 #define SAMPLES 4096
 
 static const uint32_t msb = MAX_V / SAMPLES; // uV
 
-static volatile uint32_t t[T_NUM] = { 0 };
+static inline uint32_t to_temp(uint32_t conv) {
+    const uint32_t uV = conv * msb;
+    const uint32_t mV = uV / 1000;
+    return (mV - 54) / 10;
+}
 
 static void TIM_init(uint32_t sample_period);
 static void ADC_init(void);
 
-void BSP_T_init(uint32_t sample_period_us) {
-    TIM_init(sample_period_us);
+void BSP_T_init(uint32_t sample_period_ms) {
+    TIM_init(sample_period_ms * 1000);
     ADC_init();
     ADC_TIM_FREEZE_DBG();
 
@@ -46,18 +50,20 @@ void BSP_T_stop(void) {
     HAL_ADC_Stop_IT(&hadc1);
 }
 
-volatile uint32_t* BSP_T_get(void) {
-    return t;
-}
-
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
-    for (uint32_t i = 1; i < T_NUM; ++i) {
-        t[i] = t[i - 1];
-    }
-    const uint32_t conv = HAL_ADC_GetValue(hadc);
-    const uint32_t uV = conv * msb;
-    const uint32_t mV = uV / 1000;
-    t[0] = (mV - 54) / 10;
+    static volatile uint32_t t = 0;
+    static volatile uint32_t ts[T_NUM] = { 0 };
+    static volatile uint32_t t_index = 0;
+    
+    const uint32_t new_t = to_temp(HAL_ADC_GetValue(hadc));
+    const uint32_t old_t = ts[t_index];
+
+    t -= old_t;
+    t += new_t;
+    BSP_T_on_conversion(t / T_NUM);
+
+    ts[t_index] = new_t;
+    t_index = (t_index + 1) & (T_NUM - 1); // fast % operation for powers of 2
 }
 
 static void TIM_init(uint32_t sample_period) {
@@ -67,7 +73,7 @@ static void TIM_init(uint32_t sample_period) {
     TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = { 0 };
 
     if (sample_period < TICK) {
-        Error_Handler("T: Failed to init TIM");
+        Error_Handler("T: Invalid sample period");
     }
 
     uint32_t prescaler = HAL_RCC_GetSysClockFreq() / FREQ;

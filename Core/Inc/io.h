@@ -8,10 +8,11 @@ extern "C" {
 #include <stdint.h>
 
 void BSP_IO_init(void);
-uint8_t BSP_IO_get_cursor(uint8_t current_cursor);
+uint8_t BSP_IO_get_cursor(uint8_t current_cursor, uint8_t num_positions);
 void BSP_IO_Ok_interrupt(void);
 uint8_t BSP_IO_ok_clicked(void);
 uint32_t BSP_IO_get_rotary(uint32_t min_value, uint32_t max_value);
+void BSP_IO_set_rotary(uint32_t value);
 
 #ifdef __cplusplus
 }
