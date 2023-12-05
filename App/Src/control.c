@@ -4,9 +4,7 @@
 #include "power.h"
 #include "temperature.h"
 
-#define KP 8
-#define KI 0
-#define KD 140
+PID pid = {{ 10, 0, 140 }};
 
 static uint32_t temp = 0;
 static uint32_t target_temp = 0;
@@ -17,6 +15,14 @@ static int32_t integral_error = 0;
 void Oven_start(void) {
     BSP_T_start();
     BSP_Power_start();
+}
+
+PID Oven_get_PID(void) {
+    return pid;
+}
+
+void Oven_set_PID(PID pid_) {
+    pid = pid_;
 }
 
 void Oven_stop(void) {
@@ -37,9 +43,9 @@ void Oven_control(uint32_t current_temp) {
     int32_t error = (int32_t) target_temp - (int32_t) current_temp;
     int32_t d_error = error - last_error;
 
-    int32_t pid = KP * error + KI * integral_error + KD * d_error;
+    int32_t v = (int32_t)pid.p * error + (int32_t)pid.i * integral_error + (int32_t)pid.d * d_error;
 
-    uint32_t power = pid > 0 ? (uint32_t)pid : 0;
+    uint32_t power = v > 0 ? (uint32_t)v : 0;
     power = power > MAX_POWER ? MAX_POWER : power;
 
     BSP_Power_set(power);
