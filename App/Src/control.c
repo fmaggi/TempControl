@@ -13,6 +13,8 @@ static int32_t last_error = 0;
 static int32_t integral_error = 0;
 
 void Oven_start(void) {
+    last_error = 0;
+    integral_error = 0;
     BSP_T_start();
     BSP_Power_start();
 }

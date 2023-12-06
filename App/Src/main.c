@@ -205,7 +205,7 @@ static AppState linear_curve(uint8_t first_entry) {
 
     uint32_t current_time = BSP_millis();
     uint32_t elapsed_seconds = (current_time - start_time) / 1000;
-    uint32_t target = elapsed_seconds / 5;
+    uint32_t target = 20 + elapsed_seconds / 5;
     target = target > 150 ? 150 : target;
     Oven_set_target(target);
     if (target != last_target) {

@@ -45,6 +45,7 @@ void BSP_Power_start(void) {
 }
 
 void BSP_Power_stop(void) {
+    BSP_Power_set(0);
     HAL_GPIO_WritePin(Triac1_GPIO_Port, Triac1_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(Triac2_GPIO_Port, Triac2_Pin, GPIO_PIN_RESET);
     HAL_NVIC_DisableIRQ(ZC_EXTI_IRQn);
