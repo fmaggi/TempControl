@@ -4,7 +4,7 @@
 #include "power.h"
 #include "temperature.h"
 
-PID pid = {{ 10, 0, 140 }};
+PID pid = {0};
 
 static uint32_t temp = 0;
 static uint32_t target_temp = 0;
@@ -26,6 +26,7 @@ void Oven_set_PID(PID pid_) {
 }
 
 void Oven_stop(void) {
+    Oven_set_target(0);
     BSP_Power_stop();
     BSP_T_stop();
 }

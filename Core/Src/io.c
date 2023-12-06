@@ -45,12 +45,12 @@ uint8_t BSP_IO_ok_clicked(void) {
 
 uint32_t BSP_IO_get_rotary(uint32_t min_value, uint32_t max_value) {
     uint32_t cnt = IO_TIM->CNT >> 2;
-    if (cnt < min_value+1) {
+    if (min_value > 0 && cnt <= min_value) {
         IO_TIM->CNT = min_value << 2;
         return min_value;
     }
 
-    if (cnt > max_value-1) {
+    if (cnt >=max_value) {
         IO_TIM->CNT = max_value << 2;
         return max_value;
     }

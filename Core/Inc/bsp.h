@@ -12,12 +12,13 @@ extern "C" {
 #include "temperature.h"
 #include "io.h"
 
+#define FLASH_STORAGE __attribute__((__section__(".user_data")))
+
 void BSP_init(void);
 void BSP_delay(uint32_t ms);
 uint32_t BSP_millis(void);
 
-uint8_t BSP_get_cursor(uint8_t current_cursor);
-uint8_t BSP_ok_clicked(void);
+void BSP_Flash_write(void* address_start, uint32_t numberofwords, uint32_t* data);
 
 void Error_Handler(const char* msg);
 

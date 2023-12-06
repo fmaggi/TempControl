@@ -1,9 +1,15 @@
 #include "bsp.h"
 
 #include "bsp_internal.h"
+#include "cmsis_gcc.h"
+#include "stm32f1xx_hal_flash.h"
+#include "stm32f1xx_hal_flash_ex.h"
 
 #include <stdint.h>
 #include <stdio.h>
+
+extern uint32_t _user_data_start;
+#define FLASH_START ((uint32_t)&_user_data_start)
 
 void SystemClock_Config(void);
 
@@ -24,6 +30,35 @@ void BSP_delay(uint32_t ms) {
 
 uint32_t BSP_millis(void) {
     return HAL_GetTick();
+}
+
+// NOTE: should do something with error
+void BSP_Flash_write(void* address_start, uint32_t numberofwords, uint32_t* data) {
+    static FLASH_EraseInitTypeDef EraseInitStruct;
+    uint32_t PAGEError = 0;
+
+    HAL_FLASH_Unlock();
+
+    EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
+    EraseInitStruct.PageAddress = FLASH_START;
+    EraseInitStruct.NbPages = 1;
+
+    if (HAL_FLASHEx_Erase(&EraseInitStruct, &PAGEError) != HAL_OK) {
+        goto ret;
+    }
+
+    for (uint32_t i = 0; i<numberofwords; ++i) {
+        uint32_t address = (uint32_t)address_start + i*4;
+        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, data[i]) != HAL_OK) {
+            PAGEError = HAL_FLASH_GetError();
+            goto ret;
+        }
+
+    }
+
+ret:
+    HAL_FLASH_Lock();
+    return;
 }
 
 /**
@@ -68,7 +103,9 @@ void SystemClock_Config(void) {
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     switch (GPIO_Pin) {
         case ZC_Pin: {
+            __disable_irq();
             BSP_Power_ZC_interrupt();
+            __enable_irq();
             break;
         }
         case Ok_Pin: {

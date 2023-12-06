@@ -26,6 +26,7 @@ struct UI {
 #define UI_UNSELECTED 0xff
 #define UI_INIT(entries) { entries, sizeof(entries) / sizeof(entries[0]), 0, 0 }
 
+void UI_Enter(struct UI* ui, const char* title);
 void UI_Reset(struct UI* ui);
 void UI_Write(const struct UI* ui);
 void UI_Update_entry(const struct UI* ui, uint8_t entry, uint8_t from);

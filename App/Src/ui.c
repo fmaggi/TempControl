@@ -17,6 +17,13 @@ static inline void fill_menu_entry(uint8_t at, uint16_t color) {
     BSP_Display_fill_rect(0, y, SCREEN_WIDTH, BOX_HEIGHT, color);
 }
 
+void UI_Enter(struct UI* ui, const char* title) {
+    UI_Reset(ui);
+    UI_Clear();
+    UI_Write_Title(title);
+    UI_Write(ui);
+}
+
 void UI_Clear(void) {
     BSP_Display_clear(BG_COLOR);
 }

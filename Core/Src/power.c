@@ -35,6 +35,8 @@ void BSP_Power_init(void) {
 }
 
 void BSP_Power_start(void) {
+    HAL_GPIO_WritePin(Triac1_GPIO_Port, Triac1_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(Triac2_GPIO_Port, Triac2_Pin, GPIO_PIN_RESET);
     HAL_NVIC_EnableIRQ(ZC_EXTI_IRQn);
     HAL_NVIC_EnableIRQ(P_TIM_IRQn);
     HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
@@ -43,6 +45,8 @@ void BSP_Power_start(void) {
 }
 
 void BSP_Power_stop(void) {
+    HAL_GPIO_WritePin(Triac1_GPIO_Port, Triac1_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(Triac2_GPIO_Port, Triac2_Pin, GPIO_PIN_RESET);
     HAL_NVIC_DisableIRQ(ZC_EXTI_IRQn);
     HAL_NVIC_DisableIRQ(P_TIM_IRQn);
     period1 = UNREACHABLE_PERIOD;

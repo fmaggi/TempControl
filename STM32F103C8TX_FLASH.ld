@@ -39,7 +39,8 @@ ENTRY(Reset_Handler)
 MEMORY
 {
     RAM    (xrw)    : ORIGIN = 0x20000000,   LENGTH = 20K
-    FLASH    (rx)    : ORIGIN = 0x8000000,   LENGTH = 64K
+    FLASH   (rx)    : ORIGIN = 0x8000000,   LENGTH = 63K
+    DATA   (rw)     : ORIGIN = 0x800fc00,   LENGTH = 1K
 }
 
 /* Highest address of the user mode stack */
@@ -128,6 +129,15 @@ SECTIONS
     PROVIDE_HIDDEN (__fini_array_end = .);
     . = ALIGN(4);
   } >FLASH
+
+  .user_data (NOLOAD):
+  {
+    . = ALIGN(4);
+    _user_data_start = .; /* create a global symbol at user_data start */
+    KEEP(*(.user_data))
+    . = ALIGN(4);
+    _user_data_end = .;  /* create a global symbol at user_data end */
+  } >DATA
 
   /* Used by the startup to initialize data */
   _sidata = LOADADDR(.data);
