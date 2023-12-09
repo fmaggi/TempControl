@@ -3,11 +3,14 @@
 #include "display.h"
 #include "io.h"
 #include "power.h"
+#include "storage.h"
 #include "temperature.h"
 #include "ui.h"
 
 #include <stdint.h>
 #include <stdio.h>
+
+#define CONTROL_HEADER 0xaa
 
 typedef enum {
     MAIN_MENU = 0,
@@ -15,31 +18,47 @@ typedef enum {
     MANUAL_SET,
     LINEAR_CURVE,
     PID_EDIT,
-    LAST_STATE = PID_EDIT
+    EXT_CONTROL,
+    LAST_STATE = EXT_CONTROL
 } AppState;
-
-FLASH_STORAGE PID storage_pid;
 
 static AppState main_menu(uint8_t first_entry) {
     static const char* menu_entries[] = { "Medir T", "Control Manual", "Curva Lineal", "Editar PID" };
     static struct UI menu = UI_INIT(menu_entries);
 
+    static uint8_t header = 0;
+
     if (first_entry) {
+        BSP_Comms_receive_expect(&header, 1);
         UI_Enter(&menu, "Menu Principal");
     }
 
     UI_Move_cursor(&menu);
 
     if (UI_Selected(&menu)) {
+        BSP_Comms_abort();
         return (AppState) (menu.pos + 1);
+    }
+
+    if (BSP_Comms_received() && header == CONTROL_HEADER) { 
+        BSP_Comms_transmit_block(&header, 1);
+        return EXT_CONTROL;
     }
 
     return MAIN_MENU;
 }
 
+static AppState external_control(uint8_t first_entry) {
+    if (first_entry) {
+        BSP_Display_clear(GREEN);
+    }
+    
+    return EXT_CONTROL;
+}
+
 static AppState edit_pid(uint8_t first_entry) {
     static char p_buf[8];
-    static char i_buf[8];
+    static char i_buf[30];
     static char d_buf[8];
     static const char* menu_entries[] = { p_buf, i_buf, d_buf, "< Volver" };
     static struct UI menu = UI_INIT(menu_entries);
@@ -49,7 +68,7 @@ static AppState edit_pid(uint8_t first_entry) {
     if (first_entry) {
         pid = Oven_get_PID();
         sprintf(p_buf, "P=%d", pid.p);
-        sprintf(i_buf, "I=%d", pid.i);
+        sprintf(i_buf, "I=%d     (Divido por 100)", pid.i);
         sprintf(d_buf, "D=%d", pid.d);
 
         UI_Enter(&menu, "Editar PID");
@@ -59,7 +78,7 @@ static AppState edit_pid(uint8_t first_entry) {
     uint8_t index = menu.selected;
     if (clicked) {
         if (menu.selected == 3) {
-            BSP_Flash_write(&storage_pid, 3, pid.coeffs);
+            Storage_set_PID(pid);
             return MAIN_MENU;
         } else {
             BSP_IO_set_rotary(pid.coeffs[index]);
@@ -241,7 +260,7 @@ static AppState linear_curve(uint8_t first_entry) {
 
 int main(void) {
     BSP_init();
-    Oven_set_PID(storage_pid);
+    Oven_set_PID(Storage_get_PID());
 
     AppState current_state = MAIN_MENU;
     AppState next_state = MAIN_MENU;
@@ -256,6 +275,7 @@ int main(void) {
             case MANUAL_SET: next_state = manual_set(changed_state); break;
             case LINEAR_CURVE: next_state = linear_curve(changed_state); break;
             case PID_EDIT: next_state = edit_pid(changed_state); break;
+            case EXT_CONTROL: next_state = external_control(changed_state); break;
         }
 
         changed_state = next_state != current_state;

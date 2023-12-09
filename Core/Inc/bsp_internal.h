@@ -42,4 +42,9 @@ void Error_Handler(const char* msg);
 #define Ok_GPIO_Port GPIOB
 #define Ok_EXTI_IRQn EXTI9_5_IRQn
 
+#define TX_Pin GPIO_PIN_9
+#define TX_GPIO_Port GPIOA
+#define RX_Pin GPIO_PIN_10
+#define RX_GPIO_Port GPIOA
+
 #endif /* __INTERNAL_H */

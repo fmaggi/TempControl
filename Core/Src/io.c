@@ -2,6 +2,8 @@
 
 #include "bsp_internal.h"
 #include "stm32f1xx_hal.h"
+#include "stm32f1xx_hal_def.h"
+#include "stm32f1xx_hal_uart.h"
 
 TIM_HandleTypeDef htim4;
 #define IO_TIM            TIM4
@@ -9,14 +11,19 @@ TIM_HandleTypeDef htim4;
 
 #define DEBOUNCE 50
 
+UART_HandleTypeDef huart1;
+
 static volatile uint8_t ok_clicked = 0;
+static volatile uint8_t received = 0;
 
 static void GPIO_init(void);
 static void TIM_init(void);
+static void USART_init(void);
 
 void BSP_IO_init(void) {
     GPIO_init();
     TIM_init();
+    USART_init();
 
     IO_TIM_FREEZE_DBG();
 
@@ -50,7 +57,7 @@ uint32_t BSP_IO_get_rotary(uint32_t min_value, uint32_t max_value) {
         return min_value;
     }
 
-    if (cnt >=max_value) {
+    if (cnt >= max_value) {
         IO_TIM->CNT = max_value << 2;
         return max_value;
     }
@@ -60,6 +67,33 @@ uint32_t BSP_IO_get_rotary(uint32_t min_value, uint32_t max_value) {
 
 void BSP_IO_set_rotary(uint32_t v) {
     IO_TIM->CNT = v << 2;
+}
+
+void BSP_Comms_abort(void) {
+    HAL_UART_Abort_IT(&huart1);
+}
+
+void BSP_Comms_transmit_block(uint8_t* buf, uint16_t size) {
+    HAL_UART_Transmit(&huart1, buf, size, HAL_MAX_DELAY);
+}
+
+void BSP_Comms_transmit(uint8_t* buf, uint16_t size) {
+    HAL_UART_Transmit_IT(&huart1, buf, size);
+}
+
+void BSP_Comms_receive_expect(uint8_t* buf, uint16_t size) {
+    HAL_UART_Receive_IT(&huart1, buf, size);
+}
+
+uint8_t BSP_Comms_received(void) {
+    uint8_t temp = received;
+    received = 0;
+    return temp;
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    (void)huart;
+    received = 1;
 }
 
 static void GPIO_init(void) {
@@ -111,5 +145,19 @@ static void TIM_init(void) {
     sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
     if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK) {
         Error_Handler("IO: Failed to init TIM");
+    }
+}
+
+static void USART_init(void) {
+    huart1.Instance = USART1;
+    huart1.Init.BaudRate = 115200;
+    huart1.Init.WordLength = UART_WORDLENGTH_9B;
+    huart1.Init.StopBits = UART_STOPBITS_1;
+    huart1.Init.Parity = UART_PARITY_EVEN;
+    huart1.Init.Mode = UART_MODE_TX_RX;
+    huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+    if (HAL_UART_Init(&huart1) != HAL_OK) {
+        Error_Handler("IO: Failed to init USART");
     }
 }
