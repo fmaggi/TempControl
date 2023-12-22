@@ -3,11 +3,12 @@
 #include "bsp.h"
 #include "power.h"
 #include "temperature.h"
+#include <stdint.h>
 
 PID pid = {0};
 
-static uint32_t temp = 0;
-static uint32_t target_temp = 0;
+static uint16_t temp = 0;
+static uint16_t target_temp = 0;
 
 static int32_t last_error = 0;
 static int32_t integral_error = 0;
@@ -37,11 +38,11 @@ int32_t Oven_error(void) {
     return last_error;
 }
 
-uint32_t Oven_temperature(void) {
+uint16_t Oven_temperature(void) {
     return temp;
 }
 
-void Oven_control(uint32_t current_temp) {
+void Oven_control(uint16_t current_temp) {
     temp = current_temp;
     int32_t error = (int32_t) target_temp - (int32_t) current_temp;
     int32_t d_error = error - last_error;
@@ -57,10 +58,13 @@ void Oven_control(uint32_t current_temp) {
     integral_error += error;
 }
 
-void Oven_set_target(uint32_t target) {
+void Oven_set_target(uint16_t target) {
     target_temp = target;
 }
 
 void BSP_T_on_conversion(uint32_t temperature) {
-    Oven_control(temperature);
+    if (temperature > UINT16_MAX) {
+        Error_Handler("Invalid temperature");
+    }
+    Oven_control((uint16_t)temperature);
 }

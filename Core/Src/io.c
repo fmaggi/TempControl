@@ -1,8 +1,10 @@
 #include "io.h"
 
+#include "bsp.h"
 #include "bsp_internal.h"
 #include "stm32f1xx_hal.h"
 #include "stm32f1xx_hal_def.h"
+#include "stm32f1xx_hal_gpio.h"
 #include "stm32f1xx_hal_uart.h"
 
 TIM_HandleTypeDef htim4;
@@ -69,8 +71,12 @@ void BSP_IO_set_rotary(uint32_t v) {
     IO_TIM->CNT = v << 2;
 }
 
+void BSP_IO_Toggle_LED(void) {
+    HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+}
+
 void BSP_Comms_abort(void) {
-    HAL_UART_Abort_IT(&huart1);
+    HAL_UART_Abort(&huart1);
 }
 
 void BSP_Comms_transmit_block(uint8_t* buf, uint16_t size) {
@@ -79,6 +85,16 @@ void BSP_Comms_transmit_block(uint8_t* buf, uint16_t size) {
 
 void BSP_Comms_transmit(uint8_t* buf, uint16_t size) {
     HAL_UART_Transmit_IT(&huart1, buf, size);
+}
+
+void BSP_Comms_receive_block(uint8_t* buf, uint16_t size) {
+    const HAL_StatusTypeDef e = HAL_UART_Receive(&huart1, buf, size, HAL_MAX_DELAY - 1);
+    switch (e) {
+        case HAL_OK: return;
+        case HAL_ERROR: Error_Handler("UART Error");
+        case HAL_BUSY: Error_Handler("UART Busy");
+        case HAL_TIMEOUT: Error_Handler("UART Timeout");
+    }
 }
 
 void BSP_Comms_receive_expect(uint8_t* buf, uint16_t size) {
@@ -91,8 +107,8 @@ uint8_t BSP_Comms_received(void) {
     return temp;
 }
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-    (void)huart;
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef* huart) {
+    (void) huart;
     received = 1;
 }
 
@@ -150,10 +166,10 @@ static void TIM_init(void) {
 
 static void USART_init(void) {
     huart1.Instance = USART1;
-    huart1.Init.BaudRate = 115200;
-    huart1.Init.WordLength = UART_WORDLENGTH_9B;
+    huart1.Init.BaudRate = 9600;
+    huart1.Init.WordLength = UART_WORDLENGTH_8B;
     huart1.Init.StopBits = UART_STOPBITS_1;
-    huart1.Init.Parity = UART_PARITY_EVEN;
+    huart1.Init.Parity = UART_PARITY_NONE;
     huart1.Init.Mode = UART_MODE_TX_RX;
     huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
     huart1.Init.OverSampling = UART_OVERSAMPLING_16;

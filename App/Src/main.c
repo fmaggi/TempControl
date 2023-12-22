@@ -10,7 +10,14 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define CONTROL_HEADER 0xaa
+enum Command {
+    Talk = 0xAA,
+    Curve = 0xCC,
+    PIDSend = 0xDD,
+    PIDSet = 0xDE,
+    Start = 0xFF,
+    Stop = 0xFE,
+};
 
 typedef enum {
     MAIN_MENU = 0,
@@ -40,19 +47,72 @@ static AppState main_menu(uint8_t first_entry) {
         return (AppState) (menu.pos + 1);
     }
 
-    if (BSP_Comms_received() && header == CONTROL_HEADER) { 
-        BSP_Comms_transmit_block(&header, 1);
-        return EXT_CONTROL;
+    if (BSP_Comms_received()) {
+        if (header == Talk) {
+            return EXT_CONTROL;
+        }
+
+        BSP_Comms_receive_expect(&header, 1);
     }
 
     return MAIN_MENU;
 }
 
 static AppState external_control(uint8_t first_entry) {
+    static enum Command command = 0;
+
     if (first_entry) {
+        BSP_Comms_receive_expect((uint8_t*) &command, sizeof(uint8_t));
         BSP_Display_clear(GREEN);
     }
-    
+
+    if (BSP_Comms_received()) {
+        switch (command) {
+            case Talk: break;
+            case Curve: {
+                BSP_Display_write_text("Curve set", 10, 10, MENU_FONT, BLACK, GREEN);
+                uint8_t index = 0;
+                BSP_Comms_receive_block(&index, 1);
+                uint16_t curve[CURVE_LENGTH];
+                BSP_Comms_receive_block((uint8_t*) curve, sizeof(uint16_t) * CURVE_LENGTH);
+                Storage_set_curve(index, curve);
+                break;
+            };
+            case PIDSend: {
+                /* BSP_Display_write_text("PID get", 10, 10, MENU_FONT, BLACK, GREEN); */
+                PID pid = Oven_get_PID();
+                BSP_Comms_transmit_block((uint8_t*) pid.coeffs, sizeof(uint32_t) * 3);
+                break;
+            };
+            case PIDSet: {
+                /* BSP_Display_write_text("PID set", 10, 10, MENU_FONT, BLACK, GREEN); */
+                PID pid = { 0 };
+                BSP_Comms_receive_block((uint8_t*) &pid.p, sizeof(uint32_t));
+                BSP_Comms_receive_block((uint8_t*) &pid.i, sizeof(uint32_t));
+                BSP_Comms_receive_block((uint8_t*) &pid.d, sizeof(uint32_t));
+                char pid_buf[50];
+                sprintf(pid_buf, "%d %d %d", pid.p, pid.i, pid.d);
+                BSP_Display_write_text(pid_buf, 10, 30, MENU_FONT, BLACK, WHITE);
+                Oven_set_PID(pid);
+                Storage_set_PID(pid);
+                break;
+            };
+            case Start: {
+                uint8_t index = 0;
+                BSP_Comms_receive_block(&index, 1);
+                // set index and return curve;
+                return LINEAR_CURVE;
+            };
+            case Stop: return MAIN_MENU;
+            default: {
+                char err[50];
+                sprintf(err, "Unknown message %d", (uint32_t)command);
+                Error_Handler(err);
+            }
+        }
+        BSP_Comms_receive_expect((uint8_t*) &command, sizeof(uint8_t));
+    }
+
     return EXT_CONTROL;
 }
 
@@ -104,7 +164,7 @@ static AppState edit_pid(uint8_t first_entry) {
 }
 
 static AppState measure_temp(uint8_t first_entry) {
-    static char measurement[10] = "T(C)=";
+    static char measurement[50] = "T(C)=";
     static const char* entries[] = { measurement };
     static struct UI ui = UI_INIT(entries);
 
@@ -113,8 +173,8 @@ static AppState measure_temp(uint8_t first_entry) {
         BSP_T_start();
     }
 
-    static uint32_t last_t = 0;
-    uint32_t current_t = Oven_temperature();
+    static uint16_t last_t = 0;
+    uint16_t current_t = Oven_temperature();
     if (current_t != last_t) {
         last_t = current_t;
         sprintf(measurement + 5, "%d", current_t);
@@ -130,10 +190,10 @@ static AppState measure_temp(uint8_t first_entry) {
 }
 
 static AppState manual_set(uint8_t first_entry) {
-    static uint32_t last_t = 0;
-    static uint32_t current_target = 50;
-    static char set_point_buf[20] = "Set point(C)=";
-    static char temp_buf[10] = "T(C)=";
+    static uint16_t last_t = 0;
+    static uint16_t current_target = 50;
+    static char set_point_buf[50] = "Set point(C)=";
+    static char temp_buf[50] = "T(C)=";
     static const char* menu_entries[] = { set_point_buf, temp_buf, "< Volver" };
     static struct UI ui = UI_INIT(menu_entries);
 
@@ -148,7 +208,7 @@ static AppState manual_set(uint8_t first_entry) {
         Oven_start();
     }
 
-    uint32_t current_t = Oven_temperature();
+    uint16_t current_t = Oven_temperature();
     if (current_t != last_t) {
         last_t = current_t;
         sprintf(temp_buf + 5, "%d", current_t);
@@ -176,7 +236,7 @@ static AppState manual_set(uint8_t first_entry) {
     if (ui.selected == UI_UNSELECTED) {
         UI_Move_cursor(&ui);
     } else if (ui.selected == 0) {
-        uint32_t target = BSP_IO_get_rotary(0, 250);
+        uint16_t target = (uint16_t) BSP_IO_get_rotary(0, 250);
         if (target != current_target) {
             current_target = target;
             sprintf(set_point_buf + 13, "%d", target);
@@ -194,14 +254,14 @@ static AppState manual_set(uint8_t first_entry) {
 }
 
 static AppState linear_curve(uint8_t first_entry) {
-    static uint32_t last_temp = 0;
-    static char set_point_buf[20] = "Set point(C)=";
-    static char temp_buf[10] = "T(C)=";
+    static uint16_t temp = 0;
+    static char set_point_buf[50] = "Set point(C)=";
+    static char temp_buf[50] = "T(C)=";
     static const char* menu_entries[] = { set_point_buf, temp_buf, "< Volver" };
     static struct UI ui = UI_INIT(menu_entries);
 
     static uint32_t start_time = 0;
-    static uint32_t last_target = 0;
+    static uint16_t last_target = 0;
 
     if (first_entry) {
         last_target = 0;
@@ -215,23 +275,37 @@ static AppState linear_curve(uint8_t first_entry) {
         start_time = BSP_millis();
     }
 
-    uint32_t current_temp = Oven_temperature();
-    if (current_temp != last_temp) {
-        last_temp = current_temp;
+    uint32_t current_time = BSP_millis();
+    uint16_t current_temp = Oven_temperature();
+    if (current_temp != temp) {
+        temp = current_temp;
         sprintf(temp_buf + 5, "%d", current_temp);
         UI_Update_entry(&ui, 1, 5);
     }
 
-    uint32_t current_time = BSP_millis();
-    uint32_t elapsed_seconds = (current_time - start_time) / 1000;
-    uint32_t target = 20 + elapsed_seconds / 5;
+    uint16_t elapsed_seconds = (uint16_t) ((current_time - start_time) / 1000);
+
+    uint16_t target = 20 + elapsed_seconds / 5;
     target = target > 150 ? 150 : target;
     Oven_set_target(target);
+
     if (target != last_target) {
         last_target = target;
         sprintf(set_point_buf + 13, "%d", target);
         UI_Update_entry(&ui, 0, 13);
     }
+
+    /* if (send_data) { */
+    static uint32_t last_seconds = 0;
+    if (last_seconds != elapsed_seconds) {
+        last_seconds = elapsed_seconds;
+        const uint16_t header = 0xAAAA;
+        BSP_Comms_transmit_block((uint8_t*) &header, sizeof(uint16_t));
+        BSP_Comms_transmit_block((uint8_t*) &elapsed_seconds, sizeof(uint16_t));
+        BSP_Comms_transmit_block((uint8_t*) &temp, sizeof(uint16_t));
+        BSP_Comms_transmit_block((uint8_t*) &target, sizeof(uint16_t));
+    }
+    /* } */
 
 #ifdef DEBUG
     struct PowerState power_state = BSP_Power_get();
@@ -245,6 +319,8 @@ static AppState linear_curve(uint8_t first_entry) {
     if (clicked) {
         if (ui.selected == ui.num - 1) {
             Oven_stop();
+            const uint16_t ending = 0xABAB;
+            BSP_Comms_transmit_block((uint8_t*) &ending, sizeof(uint16_t));
             return MAIN_MENU;
         }
     }
