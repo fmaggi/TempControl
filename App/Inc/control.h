@@ -2,12 +2,14 @@
 #define _CONTROL_H
 
 #include <stdint.h>
+#include "fp16.h"
 
 typedef union {
     struct {
-        uint32_t p, i, d;
+        FP16 p, i, d;
     };
-    uint32_t coeffs[3];
+
+    FP16 coeffs[3];
 } PID;
 
 void Oven_start(void);

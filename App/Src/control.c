@@ -1,6 +1,7 @@
 #include "control.h"
 
 #include "bsp.h"
+#include "fp16.h"
 #include "power.h"
 #include "temperature.h"
 #include <stdint.h>
@@ -49,7 +50,8 @@ void Oven_control(uint16_t current_temp) {
 
     int32_t v = (int32_t)pid.p * error + (int32_t)pid.i * integral_error + (int32_t)pid.d * d_error;
 
-    uint32_t power = v > 0 ? (uint32_t)v : 0;
+    FP16 uv = v > 0 ? (FP16)v : 0;
+    uint32_t power = FP_toInt(uv);
     power = power > MAX_POWER ? MAX_POWER : power;
 
     BSP_Power_set(power);

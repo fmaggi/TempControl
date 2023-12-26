@@ -1,6 +1,7 @@
 #include "bsp.h"
 #include "control.h"
 #include "display.h"
+#include "fp16.h"
 #include "io.h"
 #include "power.h"
 #include "storage.h"
@@ -90,9 +91,6 @@ static AppState external_control(uint8_t first_entry) {
                 BSP_Comms_receive_block((uint8_t*) &pid.p, sizeof(uint32_t));
                 BSP_Comms_receive_block((uint8_t*) &pid.i, sizeof(uint32_t));
                 BSP_Comms_receive_block((uint8_t*) &pid.d, sizeof(uint32_t));
-                char pid_buf[50];
-                sprintf(pid_buf, "%d %d %d", pid.p, pid.i, pid.d);
-                BSP_Display_write_text(pid_buf, 10, 30, MENU_FONT, BLACK, WHITE);
                 Oven_set_PID(pid);
                 Storage_set_PID(pid);
                 break;
@@ -117,9 +115,9 @@ static AppState external_control(uint8_t first_entry) {
 }
 
 static AppState edit_pid(uint8_t first_entry) {
-    static char p_buf[8];
-    static char i_buf[30];
-    static char d_buf[8];
+    static char p_buf[8] = "P=";
+    static char i_buf[30] = "I=";
+    static char d_buf[8] = "D=";
     static const char* menu_entries[] = { p_buf, i_buf, d_buf, "< Volver" };
     static struct UI menu = UI_INIT(menu_entries);
 
@@ -127,9 +125,9 @@ static AppState edit_pid(uint8_t first_entry) {
 
     if (first_entry) {
         pid = Oven_get_PID();
-        sprintf(p_buf, "P=%d", pid.p);
-        sprintf(i_buf, "I=%d     (Divido por 100)", pid.i);
-        sprintf(d_buf, "D=%d", pid.d);
+        FP_format(p_buf+2, pid.p, 1000);
+        FP_format(i_buf+2, pid.i, 1000);
+        FP_format(d_buf+2, pid.d, 1000);
 
         UI_Enter(&menu, "Editar PID");
     }
@@ -148,10 +146,10 @@ static AppState edit_pid(uint8_t first_entry) {
     if (menu.selected == UI_UNSELECTED) {
         UI_Move_cursor(&menu);
     } else {
-        uint32_t val = BSP_IO_get_rotary(0, 250);
+        FP16 val = (FP16)BSP_IO_get_rotary(0, (uint32_t)FP_fromInt(250));
         if (val != pid.coeffs[index]) {
             pid.coeffs[index] = val;
-            sprintf((char*) menu_entries[index] + 2, "%d", val);
+            FP_format((char*)menu_entries[index]+2, val, 1000);
             UI_Update_entry(&menu, index, 2);
         }
 
