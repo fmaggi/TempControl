@@ -1,7 +1,6 @@
 #include "bsp.h"
 
 #include "bsp_internal.h"
-#include "cmsis_gcc.h"
 #include "stm32f1xx_hal_cortex.h"
 #include "stm32f1xx_hal_flash.h"
 #include "stm32f1xx_hal_flash_ex.h"
@@ -12,6 +11,9 @@
 extern uint32_t _user_data_start;
 #define FLASH_START ((uint32_t) &_user_data_start)
 
+extern uint32_t _user_data_end;
+#define FLASH_END ((uint32_t) &_user_data_end)
+
 void SystemClock_Config(void);
 
 void BSP_init(void) {
@@ -21,7 +23,7 @@ void BSP_init(void) {
 
     BSP_Display_init();
     BSP_Power_init();
-    BSP_T_init(100); // sample every 100 ms
+    BSP_T_init(100);
     BSP_IO_init();
 }
 
@@ -42,21 +44,19 @@ void BSP_Flash_write(void* address_start, uint32_t numberofwords, uint32_t* data
 
     EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
     EraseInitStruct.PageAddress = FLASH_START;
-    EraseInitStruct.NbPages = 1;
+    EraseInitStruct.NbPages = (FLASH_END - FLASH_START) / FLASH_PAGE_SIZE;
 
     if (HAL_FLASHEx_Erase(&EraseInitStruct, &PAGEError) != HAL_OK) {
-        goto ret;
+        Error_Handler("Flash PageErase");
     }
 
     for (uint32_t i = 0; i < numberofwords; ++i) {
         uint32_t address = (uint32_t) address_start + i * 4;
         if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, data[i]) != HAL_OK) {
-            PAGEError = HAL_FLASH_GetError();
-            goto ret;
+            Error_Handler("Flash Program");
         }
     }
 
-ret:
     HAL_FLASH_Lock();
     return;
 }
@@ -117,17 +117,18 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 }
 
 __weak void Error_Handler(const char* msg) {
-    __disable_irq();
+    BSP_T_stop();
+    BSP_Power_stop();
+    BSP_Comms_abort();
+
     BSP_Display_clear(RED);
     BSP_Display_write_text(msg, 0, 0, FONT3, WHITE, RED);
-    uint32_t start = BSP_millis();
-    uint32_t now = start;
 
-    while (now < start + 30000) {
-        now = BSP_millis();
+    for (;;) {
+        if (BSP_IO_ok_clicked()) {
+            HAL_NVIC_SystemReset();
+        }
     }
-
-    HAL_NVIC_SystemReset();
 }
 
 #ifdef USE_FULL_ASSERT
