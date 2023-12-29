@@ -7,7 +7,7 @@ extern "C" {
 
 #include <stdint.h>
 
-void BSP_T_init(uint32_t sample_period_us);
+void BSP_T_init(uint32_t sample_period_ms);
 void BSP_T_start(void);
 void BSP_T_stop(void);
 
