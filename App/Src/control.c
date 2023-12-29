@@ -12,7 +12,11 @@ static uint16_t temp = 0;
 static uint16_t target_temp = 0;
 
 static int32_t last_error = 0;
+
+#define INTEGRAL_ERROR_LEN 64
 static int32_t integral_error = 0;
+static int32_t ie_buf[INTEGRAL_ERROR_LEN] = {0};
+static uint32_t ie_index = 0;
 
 void Oven_start(void) {
     last_error = 0;
@@ -47,19 +51,28 @@ uint16_t Oven_temperature(void) {
 
 void Oven_control(uint16_t current_temp) {
     temp = current_temp;
+
     int32_t error = (int32_t) target_temp - (int32_t) current_temp;
+
     int32_t d_error = error - last_error;
 
-    int32_t v = (int32_t)pid.p * error + (int32_t)pid.i * integral_error + (int32_t)pid.d * d_error;
+    integral_error -= ie_buf[ie_index];
+    integral_error += error;
 
-    FP16 uv = v > 0 ? (FP16)v : 0;
+    int32_t total_error = 0;
+    total_error += (int32_t)pid.p * error;
+    total_error += (int32_t)pid.i * integral_error;
+    total_error += (int32_t)pid.d * d_error;
+
+    FP16 uv = total_error > 0 ? (FP16)total_error : 0;
     uint32_t power = FP_toInt(uv);
     power = power > MAX_POWER ? MAX_POWER : power;
 
     BSP_Power_set(power);
 
     last_error = error;
-    integral_error += error;
+    ie_buf[ie_index] = error;
+    ie_index = (ie_index + 1) & (INTEGRAL_ERROR_LEN - 1);
 }
 
 void Oven_set_target(uint16_t target) {
