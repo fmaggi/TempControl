@@ -5,20 +5,20 @@
 
 struct Data {
     PID pid;
-    uint16_t curves[CURVE_LENGTH][NUM_CURVES];
+    Curve curves[NUM_CURVES];
 };
 
 FLASH_STORAGE struct Data data;
 
-void Storage_get_curve(uint32_t index, uint16_t curve[CURVE_LENGTH]) {
+void Storage_get_curve(uint32_t index, Curve curve) {
     if (index >= NUM_CURVES) return;
-    memcpy(curve, data.curves[index], sizeof(uint16_t)*CURVE_LENGTH);
+    memcpy(curve, data.curves[index], sizeof(Curve));
 }
 
-void Storage_set_curve(uint32_t index, const uint16_t curve[CURVE_LENGTH]) {
+void Storage_set_curve(uint32_t index, const Curve curve) {
     struct Data temp;    
     memcpy(&temp, &data, sizeof(struct Data));
-    memcpy(temp.curves[index], curve, sizeof(uint16_t) * CURVE_LENGTH);
+    memcpy(temp.curves[index], curve, sizeof(Curve));
     BSP_Flash_write(&data, sizeof(struct Data) / 4, (uint32_t*)&temp);
 }
 

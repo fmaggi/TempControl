@@ -9,6 +9,7 @@ typedef uint32_t FP16;
 #define SHIFT 16
 #define SCALE (1 << SHIFT)
 #define MASK  (SCALE - 1)
+#define ONE   ((FP16) (1 << SHIFT))
 
 static inline FP16 FP_fromInt(uint16_t n) {
     return (FP16) ((uint32_t) n << SHIFT);
@@ -23,7 +24,7 @@ static inline FP16 FP_mul(FP16 a, FP16 b) {
 }
 
 static inline FP16 FP_div(FP16 a, FP16 b) {
-    return (a << SHIFT) / b;
+    return (FP16) ((uint64_t) a << SHIFT) / b;
 }
 
 static inline uint16_t FP_decimal(FP16 a) {
@@ -37,7 +38,13 @@ static inline uint16_t FP_frac(FP16 a, uint32_t precision) {
 static inline void FP_format(char* buf, FP16 a, uint32_t precision) {
     const uint16_t d = FP_decimal(a);
     const uint16_t f = FP_frac(a, precision);
-    sprintf(buf, "%d.%d", d, f);
+    if ((a & MASK) < ONE / 100) {
+        sprintf(buf, "%d.00", d);
+    } else if ((a & MASK) < ONE / 10) {
+        sprintf(buf, "%d.0%d", d, f);
+    } else {
+        sprintf(buf, "%d.%d", d, f);
+    }
 }
 
 #endif

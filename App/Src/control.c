@@ -17,6 +17,8 @@ static int32_t integral_error = 0;
 void Oven_start(void) {
     last_error = 0;
     integral_error = 0;
+    Oven_set_target(0);
+    BSP_Power_set(0);
     BSP_T_start();
     BSP_Power_start();
 }
