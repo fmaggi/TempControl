@@ -2,6 +2,7 @@
 
 #include "bsp_internal.h"
 #include "cmsis_gcc.h"
+#include "stm32f1xx_hal_cortex.h"
 #include "stm32f1xx_hal_flash.h"
 #include "stm32f1xx_hal_flash_ex.h"
 
@@ -116,10 +117,17 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 }
 
 __weak void Error_Handler(const char* msg) {
+    __disable_irq();
     BSP_Display_clear(RED);
     BSP_Display_write_text(msg, 0, 0, FONT3, WHITE, RED);
-    __disable_irq();
-    while (1) {}
+    uint32_t start = BSP_millis();
+    uint32_t now = start;
+
+    while (now < start + 30000) {
+        now = BSP_millis();
+    }
+
+    HAL_NVIC_SystemReset();
 }
 
 #ifdef USE_FULL_ASSERT
