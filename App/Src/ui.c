@@ -4,6 +4,9 @@
 #include "display.h"
 #include "io.h"
 
+#include <stdarg.h>
+#include <stdio.h>
+
 #define STARTX 10
 #define STARTY
 
@@ -61,10 +64,10 @@ void UI_Update_entry(const struct UI* ui, uint8_t entry, uint8_t from) {
 
     uint8_t xOffset = 0;
     const char* str = ui->entries[entry];
-	uint8_t fOffset = MENU_FONT[0]; /* Offset of character */
+    uint8_t fOffset = MENU_FONT[0]; /* Offset of character */
     uint8_t fWidth = MENU_FONT[1];
     for (int i = 0; i < from; ++i) {
-		uint8_t* tempChar = (uint8_t*) &MENU_FONT[((*str - 0x20) * fOffset) + 4];
+        uint8_t* tempChar = (uint8_t*) &MENU_FONT[((*str - 0x20) * fOffset) + 4];
         uint8_t cWidth = tempChar[0] + 2;
         xOffset += cWidth < fWidth ? cWidth : fWidth;
         str++;
@@ -72,8 +75,8 @@ void UI_Update_entry(const struct UI* ui, uint8_t entry, uint8_t from) {
 
     uint16_t y = FIRST_ENTRY + BOX_HEIGHT * entry + MARGIN;
 
-    BSP_Display_fill_rect(xOffset+10, y, 40, MENU_FONT[2], color);
-    BSP_Display_write_text(ui->entries[entry]+from, STARTX+xOffset, y, MENU_FONT, FG_COLOR, color);
+    BSP_Display_fill_rect(xOffset + 10, y, 40, MENU_FONT[2], color);
+    BSP_Display_write_text(ui->entries[entry] + from, STARTX + xOffset, y, MENU_FONT, FG_COLOR, color);
 }
 
 void UI_Move_highlight(struct UI* ui, uint8_t to) {
