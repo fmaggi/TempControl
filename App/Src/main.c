@@ -12,6 +12,7 @@
 #include <stdio.h>
 
 enum Command {
+    ZERO = 0x0,
     Talk = 0xAA,
     CurveSet = 0xCC,
     CurveSend = 0xCE,
@@ -37,6 +38,7 @@ static AppState main_menu(uint8_t first_entry, uint8_t* curve_index) {
     static uint8_t header = 0;
 
     if (first_entry) {
+        header = 0;
         BSP_Comms_receive_expect(&header, 1);
         UI_Enter(&menu, "Menu Principal");
     }
@@ -70,12 +72,14 @@ static AppState external_control(uint8_t first_entry, uint8_t* curve_index) {
     static enum Command command = 0;
 
     if (first_entry) {
+        command = Talk;
         BSP_Comms_receive_expect((uint8_t*) &command, sizeof(uint8_t));
         BSP_Display_clear(GREEN);
     }
 
     if (BSP_Comms_received()) {
         switch (command) {
+            case ZERO: return MAIN_MENU;
             case Talk: break;
             case CurveSet: {
                 uint8_t index = 0;
@@ -92,6 +96,8 @@ static AppState external_control(uint8_t first_entry, uint8_t* curve_index) {
                 Curve curve;
                 Storage_get_curve(index, curve);
                 BSP_Comms_transmit_block((uint8_t*) curve, sizeof(Curve));
+                const uint16_t ending = 0xABAB;
+                BSP_Comms_transmit_block((uint8_t*) &ending, sizeof(uint16_t));
                 BSP_Display_write_text("Curve sent", 10, 10, MENU_FONT, BLACK, GREEN);
                 break;
             }
@@ -283,14 +289,22 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
 #endif
 
     uint8_t stop = elapsed_seconds >= CURVE_LENGTH;
+    AppState ret_state = MAIN_MENU;
 
     if (BSP_Comms_received()) {
-        stop = com == Stop;
-        BSP_Comms_receive_expect((uint8_t*) &com, 1);
+        if (com == Stop) {
+            stop = 1;
+            ret_state = EXT_CONTROL;
+        } else {
+            BSP_Comms_receive_expect((uint8_t*) &com, 1);
+        }
     }
 
     if (UI_Selected(&ui)) {
-        stop = ui.selected == ui.num - 1;
+        if (ui.selected == ui.num - 1) {
+            stop = 1;
+            ret_state = MAIN_MENU;
+        }
     }
 
     if (ui.selected == UI_UNSELECTED) {
@@ -303,7 +317,8 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
         Oven_stop();
         const uint16_t ending = 0xABAB;
         BSP_Comms_transmit_block((uint8_t*) &ending, sizeof(uint16_t));
-        return MAIN_MENU;
+        BSP_Comms_abort();
+        return ret_state;
     }
 
     return CURVE;
