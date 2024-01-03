@@ -5,11 +5,23 @@
 
 #include <stdint.h>
 
-#define CURVE_LENGTH 500
+#define CURVE_LENGTH 50
 
-typedef uint16_t Curve_Point;
-typedef Curve_Point Curve[CURVE_LENGTH];
-typedef Curve_Point* Curve_Ptr;
+typedef struct {
+    uint16_t time_s;
+    uint16_t temperature;
+} CurvePoint;
+
+typedef struct {
+    CurvePoint points[CURVE_LENGTH];
+    FP16 gradient;
+    uint8_t index;
+} Curve;
+
+// curve points must already be set
+void Curve_start(Curve* curve);
+uint16_t Curve_target(const Curve* curve, uint16_t time);
+uint8_t Curve_step(Curve* curve, uint16_t time);
 
 typedef union {
     struct {
@@ -29,6 +41,11 @@ uint16_t Oven_temperature(void);
 
 void Oven_control(uint16_t current_temperature);
 void Oven_set_target(uint16_t temperature);
-int32_t Oven_error(void);
+
+struct Error {
+    int32_t p, i, d;
+};
+
+struct Error Oven_error(void);
 
 #endif

@@ -5,21 +5,21 @@
 
 struct Data {
     PID pid;
-    Curve curves[NUM_CURVES];
+    CurvePoint points[CURVE_LENGTH][NUM_CURVES];
 };
 
 FLASH_STORAGE struct Data data;
 
-void Storage_get_curve(uint32_t index, Curve curve) {
+void Storage_get_curve(uint32_t index, CurvePoint points[CURVE_LENGTH]) {
     if (index >= NUM_CURVES) return;
-    memcpy(curve, data.curves[index], sizeof(Curve));
+    memcpy(points, data.points[index], sizeof(Curve));
 }
 
-void Storage_set_curve(uint32_t index, const Curve curve) {
+void Storage_set_curve(uint32_t index, const CurvePoint points[CURVE_LENGTH]) {
     struct Data temp;    
     memcpy(&temp, &data, sizeof(struct Data));
-    memcpy(temp.curves[index], curve, sizeof(Curve));
-    BSP_Flash_write(&data, sizeof(struct Data) / 4, (uint32_t*)&temp);
+    memcpy(temp.points[index], points, sizeof(Curve));
+    BSP_Flash_write(&data, sizeof(struct Data) / sizeof(uint32_t), (uint32_t*)&temp);
 }
 
 PID Storage_get_PID(void) {
@@ -32,5 +32,5 @@ void Storage_set_PID(PID pid) {
     temp.pid.p = pid.p;
     temp.pid.i = pid.i;
     temp.pid.d = pid.d;
-    BSP_Flash_write(&data, sizeof(struct Data) / 4, (uint32_t*)&temp);
+    BSP_Flash_write(&data, sizeof(struct Data) / sizeof(uint32_t), (uint32_t*)&temp);
 }
