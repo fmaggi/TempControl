@@ -193,6 +193,16 @@ static AppState edit_pid(uint8_t first_entry) {
     return PID_EDIT;
 }
 
+// NOTE: I think this is a bit cursed
+#define ON_CHANGE(var, action)                                                                                                 \
+    do {                                                                                                                       \
+        static uint32_t _last_##var = 0;                                                                                       \
+        if (_last_##var != (uint32_t) var) {                                                                                   \
+            _last_##var = (uint32_t) var;                                                                                      \
+            action;                                                                                                            \
+        }                                                                                                                      \
+    } while (0)
+
 static AppState measure_temp(uint8_t first_entry) {
     static char measurement[50] = "T(C)=";
     static const char* entries[] = { measurement };
@@ -203,13 +213,11 @@ static AppState measure_temp(uint8_t first_entry) {
         BSP_T_start();
     }
 
-    static uint16_t last_t = 0;
-    uint16_t current_t = Oven_temperature();
-    if (current_t != last_t) {
-        last_t = current_t;
-        sprintf(measurement + 5, "%d", current_t);
+    uint16_t t = Oven_temperature();
+    ON_CHANGE(t, {
+        sprintf(measurement + 5, "%d", t);
         UI_Update_entry(&ui, 0, 5);
-    }
+    });
 
     if (BSP_IO_ok_clicked()) {
         BSP_T_stop();
@@ -252,56 +260,30 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
     uint32_t current_time = BSP_millis();
     uint16_t elapsed_seconds = (uint16_t) ((current_time - start_time) / 1000);
 
-    uint8_t done = Curve_step(&curve, elapsed_seconds);
-
     uint16_t target = Curve_target(&curve, elapsed_seconds);
     Oven_set_target(target);
-    static uint16_t last_target = 0;
-    if (target != last_target) {
-        last_target = target;
+
+    ON_CHANGE(target, {
         sprintf(set_point_buf + 13, "%d", target);
         UI_Update_entry(&ui, 0, 13);
-    }
+    });
 
-    uint16_t current_temp = Oven_temperature();
-    static uint16_t temp = 0;
-    if (current_temp != temp) {
-        temp = current_temp;
-        sprintf(temp_buf + 5, "%d", current_temp);
+    uint16_t temp = Oven_temperature();
+    ON_CHANGE(temp, {
+        sprintf(temp_buf + 5, "%d", temp);
         UI_Update_entry(&ui, 1, 5);
-    }
+    });
 
-    /* if (send_data) { */
-    static uint32_t last_seconds = 0;
-    if (last_seconds != elapsed_seconds) {
-        last_seconds = elapsed_seconds;
-        static uint16_t data[] = { 0xAAAA, 0, 0, 0 };
+    ON_CHANGE(elapsed_seconds, {
+        static uint16_t data[4];
+        data[0] = 0xAAAA;
         data[1] = elapsed_seconds;
         data[2] = temp;
         data[3] = target;
         BSP_Comms_transmit((uint8_t*) data, sizeof(uint16_t) * 4);
-    }
-    /* } */
+    });
 
-#define SHOWERR
-#ifdef DEBUG
-    char _debugbuf[20] = { 0 };
-    #ifdef SHOWPOWER
-    struct PowerState power_state = BSP_Power_get();
-    sprintf(_debugbuf, "%d %d %d", power_state.power, power_state.period1, power_state.period2);
-    BSP_Display_write_text("AAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
-    BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
-    #else
-        #ifdef SHOWERR
-    struct Error e = Oven_error();
-    sprintf(_debugbuf, "%d %d %d %d", e.p, e.i, e.d, curve.gradient);
-    BSP_Display_write_text("AAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
-    BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
-        #endif
-    #endif
-#endif
-
-    uint8_t stop = done;
+    uint8_t stop = Curve_step(&curve, elapsed_seconds);
     AppState ret_state = MAIN_MENU;
 
     if (BSP_Comms_received()) {
@@ -334,8 +316,28 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
         return ret_state;
     }
 
+#define SHOWERR
+#ifdef DEBUG
+    char _debugbuf[20] = { 0 };
+    #ifdef SHOWPOWER
+    struct PowerState power_state = BSP_Power_get();
+    sprintf(_debugbuf, "%d %d %d", power_state.power, power_state.period1, power_state.period2);
+    BSP_Display_write_text("AAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
+    BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
+    #else
+        #ifdef SHOWERR
+    struct Error e = Oven_error();
+    sprintf(_debugbuf, "%d %d %d %d", e.p, e.i, e.d, curve.gradient);
+    BSP_Display_write_text("AAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
+    BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
+        #endif
+    #endif
+#endif
+
     return CURVE;
 }
+
+#undef ON_CHANGE
 
 int main(void) {
     BSP_init();
