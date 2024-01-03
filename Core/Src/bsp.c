@@ -44,7 +44,7 @@ void BSP_Flash_write(void* address_start, uint32_t numberofwords, uint32_t* data
 
     EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
     EraseInitStruct.PageAddress = FLASH_START;
-    EraseInitStruct.NbPages = (FLASH_END - FLASH_START) / FLASH_PAGE_SIZE;
+    EraseInitStruct.NbPages = 4;
 
     if (HAL_FLASHEx_Erase(&EraseInitStruct, &PAGEError) != HAL_OK) {
         Error_Handler("Flash PageErase");
@@ -53,7 +53,10 @@ void BSP_Flash_write(void* address_start, uint32_t numberofwords, uint32_t* data
     for (uint32_t i = 0; i < numberofwords; ++i) {
         uint32_t address = (uint32_t) address_start + i * 4;
         if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, data[i]) != HAL_OK) {
-            Error_Handler("Flash Program");
+            PAGEError = HAL_FLASH_GetError();
+            char buf[50];
+            sprintf(buf, "Flash Program %d %d %x", i, FLASH_START, FLASH_END);
+            Error_Handler(buf);
         }
     }
 
