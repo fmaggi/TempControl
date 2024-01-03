@@ -35,7 +35,6 @@ uint32_t BSP_millis(void) {
     return HAL_GetTick();
 }
 
-// NOTE: should do something with error
 void BSP_Flash_write(void* address_start, uint32_t numberofwords, uint32_t* data) {
     static FLASH_EraseInitTypeDef EraseInitStruct;
     uint32_t PAGEError = 0;
