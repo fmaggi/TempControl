@@ -5,7 +5,7 @@
 
 #include <stdint.h>
 
-#define CURVE_LENGTH 50
+#define MAX_CURVE_LENGTH 50
 
 typedef struct {
     uint16_t time_s;
@@ -13,15 +13,20 @@ typedef struct {
 } CurvePoint;
 
 typedef struct {
-    CurvePoint points[CURVE_LENGTH];
-    FP16 gradient;
-    uint8_t index;
+    CurvePoint points[MAX_CURVE_LENGTH];
+    uint8_t length;
 } Curve;
 
+typedef struct {
+    Curve curve;
+    FP16 gradient;
+    uint8_t index;
+} CurveRunner;
+
 // curve points must already be set
-void Curve_start(Curve* curve);
-uint16_t Curve_target(const Curve* curve, uint16_t time);
-uint8_t Curve_step(Curve* curve, uint16_t time);
+void Curve_start(CurveRunner* curve);
+uint16_t Curve_target(const CurveRunner* curve, uint16_t time);
+uint8_t Curve_step(CurveRunner* curve, uint16_t time);
 
 typedef union {
     struct {

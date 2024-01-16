@@ -7,36 +7,36 @@
 
 #include <stdint.h>
 
-static void update_gradient(Curve* curve) {
-    CurvePoint current = curve->points[curve->index];
-    CurvePoint next = curve->points[curve->index + 1];
+static void update_gradient(CurveRunner* r) {
+    CurvePoint current = r->curve.points[r->index];
+    CurvePoint next = r->curve.points[r->index + 1];
 
     FP16 dtemp = FP_fromInt(next.temperature - current.temperature);
     uint16_t dtime = next.time_s - current.time_s;
-    curve->gradient = dtemp / dtime;
+    r->gradient = dtemp / dtime;
 }
 
-void Curve_start(Curve* curve) {
+void Curve_start(CurveRunner* curve) {
     curve->index = 0;
     update_gradient(curve);
 }
 
-uint16_t Curve_target(const Curve* curve, uint16_t time) {
-    CurvePoint point = curve->points[curve->index];
+uint16_t Curve_target(const CurveRunner* r, uint16_t time) {
+    CurvePoint point = r->curve.points[r->index];
     uint16_t dt = time - point.time_s;
-    FP16 dT = curve->gradient * dt;
+    FP16 dT = r->gradient * dt;
     return point.temperature + FP_toInt(dT);
 }
 
-uint8_t Curve_step(Curve* curve, uint16_t time) {
-    if (curve->index >= CURVE_LENGTH) {
+uint8_t Curve_step(CurveRunner* r, uint16_t time) {
+    if (r->index >= r->curve.length) {
         return 1;
     }
 
-    CurvePoint point = curve->points[curve->index + 1];
+    CurvePoint point = r->curve.points[r->index + 1];
     if (time >= point.time_s) {
-        curve->index += 1;
-        update_gradient(curve);
+        r->index += 1;
+        update_gradient(r);
     }
 
     return 0;

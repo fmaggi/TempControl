@@ -84,18 +84,20 @@ static AppState external_control(uint8_t first_entry, uint8_t* curve_index) {
             case CurveSet: {
                 uint8_t index = 0;
                 BSP_Comms_receive_block(&index, 1);
-                CurvePoint points[CURVE_LENGTH];
-                BSP_Comms_receive_block((uint8_t*) points, sizeof(CurvePoint) * CURVE_LENGTH);
-                Storage_set_curve(index, points);
+                Curve curve;
+                BSP_Comms_receive_block(&curve.length, 1);
+                BSP_Comms_receive_block((uint8_t*) curve.points, sizeof(CurvePoint) * curve.length);
+                Storage_set_curve(index, &curve);
                 BSP_Display_write_text("Curve setted", 10, 10, MENU_FONT, BLACK, GREEN);
                 break;
             };
             case CurveSend: {
                 uint8_t index = 0;
                 BSP_Comms_receive_block(&index, 1);
-                CurvePoint points[CURVE_LENGTH];
-                Storage_get_curve(index, points);
-                BSP_Comms_transmit_block((uint8_t*) points, sizeof(CurvePoint) * CURVE_LENGTH);
+                Curve curve;
+                Storage_get_curve(index, &curve);
+                BSP_Comms_transmit_block((uint8_t*) &curve.length, 1);
+                BSP_Comms_transmit_block((uint8_t*) curve.points, sizeof(CurvePoint) * curve.length);
                 const uint16_t ending = 0xABAB;
                 BSP_Comms_transmit_block((uint8_t*) &ending, sizeof(uint16_t));
                 BSP_Display_write_text("Curve sent", 10, 10, MENU_FONT, BLACK, GREEN);
@@ -235,7 +237,7 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
 
     static uint32_t start_time = 0;
 
-    static Curve curve = { 0 };
+    static CurveRunner r = { 0 };
 
     static enum Command com = 0;
 
@@ -246,8 +248,8 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
         title[6] = '0' + curve_index + 1;
         UI_Enter(&ui, title);
 
-        Storage_get_curve(curve_index, curve.points);
-        Curve_start(&curve);
+        Storage_get_curve(curve_index, &r.curve);
+        Curve_start(&r);
 
         com = ZERO;
         BSP_Comms_receive_expect((uint8_t*) &com, 1);
@@ -260,7 +262,7 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
     uint32_t current_time = BSP_millis();
     uint16_t elapsed_seconds = (uint16_t) ((current_time - start_time) / 1000);
 
-    uint16_t target = Curve_target(&curve, elapsed_seconds);
+    uint16_t target = Curve_target(&r, elapsed_seconds);
     Oven_set_target(target);
 
     ON_CHANGE(target, {
@@ -283,7 +285,7 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
         BSP_Comms_transmit((uint8_t*) data, sizeof(uint16_t) * 4);
     });
 
-    uint8_t stop = Curve_step(&curve, elapsed_seconds);
+    uint8_t stop = Curve_step(&r, elapsed_seconds);
     AppState ret_state = MAIN_MENU;
 
     if (BSP_Comms_received()) {
@@ -327,7 +329,7 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
     #else
         #ifdef SHOWERR
     struct Error e = Oven_error();
-    sprintf(_debugbuf, "%d %d %d %d", e.p, e.i, e.d, curve.gradient);
+    sprintf(_debugbuf, "%d %d %d %d", e.p, e.i, e.d, r.gradient);
     BSP_Display_write_text("AAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
     BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
         #endif
