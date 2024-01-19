@@ -254,17 +254,14 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
         com = ZERO;
         BSP_Comms_receive_expect((uint8_t*) &com, 1);
 
-        Oven_start();
-
         start_time = BSP_millis();
     }
 
     uint32_t current_time = BSP_millis();
     uint16_t elapsed_seconds = (uint16_t) ((current_time - start_time) / 1000);
+    uint8_t stop = Curve_step(&r, elapsed_seconds);
 
-    uint16_t target = Curve_target(&r, elapsed_seconds);
-    Oven_set_target(target);
-
+    uint16_t target = Oven_target();;
     ON_CHANGE(target, {
         sprintf(set_point_buf + 13, "%d", target);
         UI_Update_entry(&ui, 0, 13);
@@ -285,7 +282,6 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
         BSP_Comms_transmit((uint8_t*) data, sizeof(uint16_t) * 4);
     });
 
-    uint8_t stop = Curve_step(&r, elapsed_seconds);
     AppState ret_state = MAIN_MENU;
 
     if (BSP_Comms_received()) {
@@ -311,7 +307,6 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
     }
 
     if (stop) {
-        Oven_stop();
         const uint16_t ending = 0xABAB;
         BSP_Comms_transmit_block((uint8_t*) &ending, sizeof(uint16_t));
         BSP_Comms_abort();

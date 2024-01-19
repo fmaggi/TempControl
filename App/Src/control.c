@@ -7,6 +7,9 @@
 
 #include <stdint.h>
 
+static void oven_start(void);
+static void oven_stop(void);
+
 static void update_gradient(CurveRunner* r) {
     CurvePoint current = r->curve.points[r->index];
     CurvePoint next = r->curve.points[r->index + 1];
@@ -19,6 +22,7 @@ static void update_gradient(CurveRunner* r) {
 void Curve_start(CurveRunner* curve) {
     curve->index = 0;
     update_gradient(curve);
+    oven_start();
 }
 
 uint16_t Curve_target(const CurveRunner* r, uint16_t time) {
@@ -30,6 +34,7 @@ uint16_t Curve_target(const CurveRunner* r, uint16_t time) {
 
 uint8_t Curve_step(CurveRunner* r, uint16_t time) {
     if (r->index >= r->curve.length) {
+        oven_stop();
         return 1;
     }
 
@@ -38,6 +43,9 @@ uint8_t Curve_step(CurveRunner* r, uint16_t time) {
         r->index += 1;
         update_gradient(r);
     }
+
+    uint16_t target = Curve_target(r, time);
+    Oven_set_target(target);
 
     return 0;
 }
@@ -58,7 +66,7 @@ static volatile int32_t integral_error = 0;
 static volatile int32_t ie_buf[INTEGRAL_ERROR_LEN] = { 0 };
 static volatile uint32_t ie_index = 0;
 
-void Oven_start(void) {
+static void oven_start(void) {
     last_error = 0;
     integral_error = 0;
     Oven_set_target(0);
@@ -75,7 +83,7 @@ void Oven_set_PID(PID pid_) {
     pid = pid_;
 }
 
-void Oven_stop(void) {
+static void oven_stop(void) {
     Oven_set_target(0);
     BSP_Power_stop();
     BSP_T_stop();
@@ -91,6 +99,10 @@ struct Error Oven_error(void) {
 
 uint16_t Oven_temperature(void) {
     return temp;
+}
+
+uint16_t Oven_target(void) {
+    return target_temp;
 }
 
 void Oven_control(uint16_t current_temp) {

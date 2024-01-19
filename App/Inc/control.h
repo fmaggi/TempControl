@@ -25,7 +25,6 @@ typedef struct {
 
 // curve points must already be set
 void Curve_start(CurveRunner* curve);
-uint16_t Curve_target(const CurveRunner* curve, uint16_t time);
 uint8_t Curve_step(CurveRunner* curve, uint16_t time);
 
 typedef union {
@@ -36,12 +35,10 @@ typedef union {
     FP16 coeffs[3];
 } PID;
 
-void Oven_start(void);
-void Oven_stop(void);
-
 PID Oven_get_PID(void);
 void Oven_set_PID(PID pid);
 
+uint16_t Oven_target(void);
 uint16_t Oven_temperature(void);
 
 void Oven_control(uint16_t current_temperature);
