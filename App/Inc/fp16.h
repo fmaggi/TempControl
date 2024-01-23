@@ -1,6 +1,7 @@
 #ifndef _FP16_H
 #define _FP16_H
 
+#include "utils.h"
 #include <stdint.h>
 #include <stdio.h>
 
@@ -39,11 +40,19 @@ static inline void FP_format(char* buf, FP16 a, uint32_t precision) {
     const uint16_t d = FP_decimal(a);
     const uint16_t f = FP_frac(a, precision);
     if ((a & MASK) < ONE / 100) {
-        sprintf(buf, "%d.00", d);
+        int32_t w = nformat_u32(buf, 50, d);
+        buf[w] = '.';
+        buf[w+1] = '0';
+        buf[w+2] = '0';
     } else if ((a & MASK) < ONE / 10) {
-        sprintf(buf, "%d.0%d", d, f);
+        int32_t w = nformat_u32(buf, 50, d);
+        buf[w] = '.';
+        buf[w+1] = '0';
+        nformat_u32(buf, 50-((uint32_t)w+2), f);
     } else {
-        sprintf(buf, "%d.%d", d, f);
+        int32_t w = nformat_u32(buf, 50, d);
+        buf[w] = '.';
+        nformat_u32(buf, 50-((uint32_t)w+1), f);
     }
 }
 

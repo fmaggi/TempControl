@@ -1,0 +1,7 @@
+#ifndef _UTILS_H
+#define _UTILS_H
+
+#include <stdint.h>
+int32_t nformat_u32(char *buf, uint32_t len, uint32_t value);
+
+#endif // !_UTILS_H

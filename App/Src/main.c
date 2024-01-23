@@ -7,6 +7,7 @@
 #include "storage.h"
 #include "temperature.h"
 #include "ui.h"
+#include "utils.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -125,8 +126,8 @@ static AppState external_control(uint8_t first_entry, uint8_t* curve_index) {
             };
             case Stop: return MAIN_MENU;
             default: {
-                char err[50];
-                sprintf(err, "Unknown message %d", (uint32_t) command);
+                char err[50] = "Unknown message";
+                nformat_u32(err+15, 50-15, command);
                 Error_Handler(err);
             }
         }
@@ -217,7 +218,7 @@ static AppState measure_temp(uint8_t first_entry) {
 
     uint16_t t = Oven_temperature();
     ON_CHANGE(t, {
-        sprintf(measurement + 5, "%d", t);
+        nformat_u32(measurement+5, 50-5, t);
         UI_Update_entry(&ui, 0, 5);
     });
 
@@ -242,7 +243,7 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
     static enum Command com = 0;
 
     if (first_entry) {
-        sprintf(set_point_buf, "Set point(C)=%d", 0);
+        set_point_buf[13] = '0';
 
         char title[] = "Curva 0";
         title[6] = '0' + curve_index + 1;
@@ -263,13 +264,13 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
 
     uint16_t target = Oven_target();;
     ON_CHANGE(target, {
-        sprintf(set_point_buf + 13, "%d", target);
+        nformat_u32(set_point_buf+13, 50-13, target);
         UI_Update_entry(&ui, 0, 13);
     });
 
     uint16_t temp = Oven_temperature();
     ON_CHANGE(temp, {
-        sprintf(temp_buf + 5, "%d", temp);
+        nformat_u32(temp_buf+5, 50, temp);
         UI_Update_entry(&ui, 1, 5);
     });
 
@@ -318,13 +319,13 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
     char _debugbuf[20] = { 0 };
     #ifdef SHOWPOWER
     struct PowerState power_state = BSP_Power_get();
-    sprintf(_debugbuf, "%d %d %d", power_state.power, power_state.period1, power_state.period2);
+    /* sprintf(_debugbuf, "%d %d %d", power_state.power, power_state.period1, power_state.period2); */
     BSP_Display_write_text("AAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
     BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
     #else
         #ifdef SHOWERR
     struct Error e = Oven_error();
-    sprintf(_debugbuf, "%d %d %d %d", e.p, e.i, e.d, r.gradient);
+    /* sprintf(_debugbuf, "%d %d %d %d", e.p, e.i, e.d, r.gradient); */
     BSP_Display_write_text("AAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
     BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
         #endif
