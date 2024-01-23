@@ -1,6 +1,96 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
+    const c_main_opt = b.option(bool, "Cmain", "Build C main file");
+    const c_main = c_main_opt orelse false;
+    if (c_main) {
+        return buildCmain(b);
+    }
+
+    const target_query = std.zig.CrossTarget{
+        .cpu_arch = .thumb,
+        .os_tag = .freestanding,
+        .abi = .eabi,
+        .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_m3 },
+    };
+
+    const target = b.resolveTargetQuery(target_query);
+
+    // .Debug config doesn't seem to fit in flash
+    const optimize = .ReleaseSmall;
+
+    const exe = b.addExecutable(.{
+        .name = "horno",
+        .target = target,
+        .optimize = optimize,
+        .root_source_file = .{ .path = "zig/main.zig" },
+        .strip = false,
+        .linkage = .static,
+        .link_libc = false,
+        .single_threaded = true,
+    });
+
+    exe.bundle_compiler_rt = true;
+    exe.link_function_sections = true;
+    exe.link_data_sections = true;
+    exe.link_gc_sections = true;
+
+    addHal(b, exe);
+
+    b.installArtifact(exe);
+}
+
+fn addHal(b: *std.Build, exe: *std.Build.Step.Compile) void {
+    const debug_opt = b.option(bool, "Debug", "Define DEBUG macro (default=true)");
+    const debug = debug_opt orelse true;
+
+    const hal_lib = b.addStaticLibrary(.{
+        .name = "HAL",
+        .target = exe.root_module.resolved_target.?,
+        .optimize = exe.root_module.optimize.?,
+        .strip = exe.root_module.strip orelse false,
+        .link_libc = exe.root_module.link_libc orelse false,
+        .single_threaded = exe.root_module.single_threaded orelse true,
+    });
+
+    hal_lib.bundle_compiler_rt = exe.bundle_compiler_rt;
+    hal_lib.link_function_sections = exe.link_function_sections;
+    hal_lib.link_data_sections = exe.link_data_sections;
+    hal_lib.link_gc_sections = exe.link_gc_sections;
+
+    hal_lib.root_module.addCMacro("__ZIG__", "1");
+
+    if (debug) {
+        hal_lib.root_module.addCMacro("DEBUG", "1");
+    }
+
+    for (Includes) |i| {
+        hal_lib.addIncludePath(.{ .path = i });
+    }
+
+    hal_lib.addAssemblyFile(.{ .path = "Core/Startup/startup_stm32f103c8tx.s" });
+    hal_lib.addCSourceFiles(.{ .files = &DriverSources, .flags = &CFlags });
+    hal_lib.addCSourceFiles(.{ .files = &CoreSources, .flags = &CFlags });
+    hal_lib.addCSourceFiles(.{ .files = &AppSources, .flags = &CFlags });
+
+    const hal = b.createModule(.{
+        .root_source_file = .{ .path = "zig/lib.zig" },
+        .target = exe.root_module.resolved_target.?,
+        .optimize = exe.root_module.optimize.?,
+        .strip = exe.root_module.strip orelse false,
+        .link_libc = exe.root_module.link_libc orelse false,
+        .single_threaded = exe.root_module.single_threaded orelse true,
+    });
+
+    hal.linkLibrary(hal_lib);
+
+    exe.root_module.addImport("HAL", hal);
+
+    exe.entry = .{ .symbol_name = "Reset_Handler" };
+    exe.setLinkerScript(.{ .path = "STM32F103C8TX_FLASH.ld" });
+}
+
+pub fn buildCmain(b: *std.Build) void {
     const target_query = std.zig.CrossTarget{
         .cpu_arch = .thumb,
         .os_tag = .freestanding,
@@ -25,6 +115,8 @@ pub fn build(b: *std.Build) void {
         .single_threaded = true,
     });
 
+    exe.root_module.addCMacro("__ZIG__", "1");
+
     if (debug) {
         exe.root_module.addCMacro("DEBUG", "1");
     }
@@ -38,26 +130,12 @@ pub fn build(b: *std.Build) void {
         exe.addIncludePath(.{ .path = i });
     }
 
-    const flags = [_][]const u8{
-        "-std=gnu11",
-        "-DUSE_HAL_DRIVER",
-        "-DSTM32F103xB",
-        "-ffunction-sections",
-        "-fdata-sections",
-        "-nostdlib",
-        "-nostdinc",
-        "-Wall",
-        "-Wextra",
-        "-pedantic",
-        "-fstack-usage",
-        "-mthumb",
-    };
-
     exe.addAssemblyFile(.{ .path = "Core/Startup/startup_stm32f103c8tx.s" });
 
-    exe.addCSourceFiles(.{ .files = &DriverSources, .flags = &flags });
-    exe.addCSourceFiles(.{ .files = &CoreSources, .flags = &flags });
-    exe.addCSourceFiles(.{ .files = &AppSources, .flags = &flags });
+    exe.addCSourceFiles(.{ .files = &DriverSources, .flags = &CFlags });
+    exe.addCSourceFiles(.{ .files = &CoreSources, .flags = &CFlags });
+    exe.addCSourceFiles(.{ .files = &AppSources, .flags = &CFlags });
+    exe.addCSourceFile(.{ .file = .{ .path = "App/Src/main.c" }, .flags = &CFlags });
 
     exe.entry = .{ .symbol_name = "Reset_Handler" };
 
@@ -76,6 +154,21 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 }
+
+const CFlags = [_][]const u8{
+    "-std=gnu11",
+    "-DUSE_HAL_DRIVER",
+    "-DSTM32F103xB",
+    "-ffunction-sections",
+    "-fdata-sections",
+    "-nostdlib",
+    "-nostdinc",
+    "-Wall",
+    "-Wextra",
+    "-pedantic",
+    "-fstack-usage",
+    "-mthumb",
+};
 
 const Includes = [_][]const u8{
     "Drivers/STM32F1xx_HAL_Driver/Inc",
@@ -128,7 +221,6 @@ const CoreSources = [_][]const u8{
 };
 
 const AppSources = [_][]const u8{
-    "App/Src/main.c",
     "App/Src/control.c",
     "App/Src/storage.c",
     "App/Src/ui.c",

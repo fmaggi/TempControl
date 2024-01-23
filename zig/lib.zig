@@ -10,10 +10,12 @@ comptime {
     }
 }
 
-export fn nformat_u32(buf: [*]c_char, len: c_uint, value: c_uint) c_int {
+pub export fn nformat_u32(buf: [*]c_char, len: c_uint, value: c_uint) c_int {
     const w = std.fmt.formatIntBuf(buf[0..len], value, 10, .lower, .{});
     return @intCast(w);
 }
+
+pub const BSP = @import("bsp.zig");
 
 // export fn memcpy(dest: *anyopaque, source: *const anyopaque, size: usize) void {
 //     const _d: [*]u8 = @ptrCast(dest);

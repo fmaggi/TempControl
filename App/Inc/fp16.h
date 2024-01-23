@@ -2,7 +2,7 @@
 #define _FP16_H
 
 #include <stdint.h>
-#include "zig.h"
+#include "utils.h"
 
 typedef uint32_t FP16;
 

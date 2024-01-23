@@ -10,7 +10,7 @@
 
 #include <stdint.h>
 /* #include <stdio.h> */
-#include "zig.h"
+#include "utils.h"
 
 enum Command {
     ZERO = 0x0,
