@@ -1,7 +1,5 @@
 #include "utils.h"
 
-#ifndef __ZIG__
-
 int32_t nformat_u32(char* buf, uint32_t len, uint32_t value) {
     if (value == 0) {
         buf[0] = '0';
@@ -10,7 +8,7 @@ int32_t nformat_u32(char* buf, uint32_t len, uint32_t value) {
 
     int32_t written = 0;
 
-    // max value = 4294967296
+    // max value = 4294967296 i.e 10 chars
     char aux[10];
     const uint32_t max = len < 10 ? len : 10;
     for (uint32_t i = 0; i < max; ++i) {
@@ -26,5 +24,3 @@ int32_t nformat_u32(char* buf, uint32_t len, uint32_t value) {
 
     return written;
 }
-
-#endif
