@@ -4,9 +4,6 @@
 #include "display.h"
 #include "io.h"
 
-#include <stdarg.h>
-#include <stdio.h>
-
 #define STARTX 10
 #define STARTY
 

@@ -54,7 +54,7 @@ defined in linker script */
  * @param  None
  * @retval : None
 */
-
+  .global Reset_Handler
   .section .text.Reset_Handler
   .weak Reset_Handler
   .type Reset_Handler, %function
@@ -95,7 +95,7 @@ LoopFillZerobss:
   bcc FillZerobss
 
 /* Call static constructors */
-    bl __libc_init_array
+/*    bl __libc_init_array */
 /* Call the application's entry point.*/
   bl main
   bx lr

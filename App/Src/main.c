@@ -9,7 +9,8 @@
 #include "ui.h"
 
 #include <stdint.h>
-#include <stdio.h>
+/* #include <stdio.h> */
+#include "zig.h"
 
 enum Command {
     ZERO = 0x0,
@@ -125,8 +126,8 @@ static AppState external_control(uint8_t first_entry, uint8_t* curve_index) {
             };
             case Stop: return MAIN_MENU;
             default: {
-                char err[50];
-                sprintf(err, "Unknown message %d", (uint32_t) command);
+                char err[50] = "Unknown message ";
+                nformat_u32(err+17, 50-17, (uint32_t)command);
                 Error_Handler(err);
             }
         }
@@ -217,7 +218,8 @@ static AppState measure_temp(uint8_t first_entry) {
 
     uint16_t t = Oven_temperature();
     ON_CHANGE(t, {
-        sprintf(measurement + 5, "%d", t);
+        nformat_u32(measurement+5, 50-5, (uint32_t)t);
+        /* sprintf(measurement + 5, "%d", t); */
         UI_Update_entry(&ui, 0, 5);
     });
 
@@ -242,7 +244,8 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
     static enum Command com = 0;
 
     if (first_entry) {
-        sprintf(set_point_buf, "Set point(C)=%d", 0);
+        nformat_u32(set_point_buf+13, 50-13, 0);
+        /* sprintf(set_point_buf, "Set point(C)=%d", 0); */
 
         char title[] = "Curva 0";
         title[6] = '0' + curve_index + 1;
@@ -263,13 +266,15 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
 
     uint16_t target = Oven_target();;
     ON_CHANGE(target, {
-        sprintf(set_point_buf + 13, "%d", target);
+        nformat_u32(set_point_buf+13, 50-13, (uint32_t)target);
+        /* sprintf(set_point_buf + 13, "%d", target); */
         UI_Update_entry(&ui, 0, 13);
     });
 
     uint16_t temp = Oven_temperature();
     ON_CHANGE(temp, {
-        sprintf(temp_buf + 5, "%d", temp);
+        nformat_u32(temp_buf+5, 50-5, (uint32_t)temp);
+        /* sprintf(temp_buf + 5, "%d", temp); */
         UI_Update_entry(&ui, 1, 5);
     });
 
@@ -324,7 +329,7 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
     #else
         #ifdef SHOWERR
     struct Error e = Oven_error();
-    sprintf(_debugbuf, "%d %d %d %d", e.p, e.i, e.d, r.gradient);
+    /* sprintf(_debugbuf, "%d %d %d %d", e.p, e.i, e.d, r.gradient); */
     BSP_Display_write_text("AAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
     BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
         #endif

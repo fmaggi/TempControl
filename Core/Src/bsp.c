@@ -53,9 +53,7 @@ void BSP_Flash_write(void* address_start, uint32_t numberofwords, uint32_t* data
         uint32_t address = (uint32_t) address_start + i * 4;
         if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, data[i]) != HAL_OK) {
             PAGEError = HAL_FLASH_GetError();
-            char buf[50];
-            sprintf(buf, "Flash Program %d %d %x", i, FLASH_START, FLASH_END);
-            Error_Handler(buf);
+            Error_Handler("Flash program");
         }
     }
 

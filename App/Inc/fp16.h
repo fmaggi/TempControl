@@ -2,7 +2,7 @@
 #define _FP16_H
 
 #include <stdint.h>
-#include <stdio.h>
+#include "zig.h"
 
 typedef uint32_t FP16;
 
@@ -39,11 +39,20 @@ static inline void FP_format(char* buf, FP16 a, uint32_t precision) {
     const uint16_t d = FP_decimal(a);
     const uint16_t f = FP_frac(a, precision);
     if ((a & MASK) < ONE / 100) {
-        sprintf(buf, "%d.00", d);
+        nformat_u32(buf, 50, d);
+        /* sprintf(buf, "%d.00", d); */
     } else if ((a & MASK) < ONE / 10) {
-        sprintf(buf, "%d.0%d", d, f);
+        int32_t w = nformat_u32(buf, 50, d);
+        buf[w] = '.';
+        buf[w+1] = '0';
+        nformat_u32(buf+w+2, 50-((uint32_t)w+2), f);
+
+        /* sprintf(buf, "%d.0%d", d, f); */
     } else {
-        sprintf(buf, "%d.%d", d, f);
+        /* sprintf(buf, "%d.%d", d, f); */
+        int32_t w = nformat_u32(buf, 50, d);
+        buf[w] = '.';
+        nformat_u32(buf+w+1, 50-((uint32_t)w+2),f);
     }
 }
 

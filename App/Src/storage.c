@@ -1,7 +1,7 @@
 #include "storage.h"
 
 #include "bsp.h"
-#include <string.h>
+#include "zig.h"
 
 struct Data {
     PID pid;
