@@ -1,8 +1,11 @@
 #include "temperature.h"
 
+#include "bsp.h"
 #include "bsp_internal.h"
 #include "stm32f1xx_hal_adc.h"
 #include "stm32f1xx_hal_rcc.h"
+
+#include <string.h>
 
 ADC_HandleTypeDef hadc1;
 #define ADC_Instance ADC1
@@ -20,6 +23,10 @@ TIM_HandleTypeDef htim1;
 #define SAMPLES 4096
 
 static const uint32_t msb = MAX_V / SAMPLES; // uV
+                                             //
+static volatile uint32_t ts[T_NUM] = { 0 };
+static volatile uint32_t t_index = 0;
+static volatile uint32_t t = 0;
 
 static inline uint32_t to_temp(uint32_t conv) {
     const uint32_t uV = conv * msb;
@@ -34,12 +41,12 @@ void BSP_T_init(uint32_t sample_period_ms) {
     TIM_init(sample_period_ms * 1000);
     ADC_init();
     ADC_TIM_FREEZE_DBG();
-
-    // Calibration enables adc
-    HAL_ADC_Stop(&hadc1);
 }
 
 void BSP_T_start(void) {
+    memset((void*) ts, 0, sizeof(ts));
+    t_index = 0;
+    t = 0;
     HAL_ADCEx_Calibration_Start(&hadc1);
     HAL_TIM_PWM_Start_IT(&htim1, TIM_CHANNEL_1);
     HAL_ADC_Start_IT(&hadc1);
@@ -51,19 +58,16 @@ void BSP_T_stop(void) {
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
-    static volatile uint32_t t = 0;
-    static volatile uint32_t ts[T_NUM] = { 0 };
-    static volatile uint32_t t_index = 0;
-    
     const uint32_t new_t = to_temp(HAL_ADC_GetValue(hadc));
     const uint32_t old_t = ts[t_index];
 
     t -= old_t;
     t += new_t;
-    BSP_T_on_conversion(t / T_NUM);
+    uint32_t _t = t / T_NUM;
+    BSP_T_on_conversion(_t);
 
     ts[t_index] = new_t;
-    t_index = (t_index + 1) & (T_NUM - 1); // fast % operation for powers of 2
+    t_index = MOD_POW2(t_index + 1, T_NUM);
 }
 
 static void TIM_init(uint32_t sample_period) {

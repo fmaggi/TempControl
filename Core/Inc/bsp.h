@@ -12,6 +12,8 @@ extern "C" {
 #include "temperature.h"
 #include "io.h"
 
+#define MOD_POW2(a, b) (a) & ((b)-1)
+
 #define FLASH_STORAGE __attribute__((__section__(".user_data")))
 
 void BSP_init(void);

@@ -2,8 +2,6 @@
 #define _FP16_H
 
 #include "utils.h"
-#include <stdint.h>
-#include <stdio.h>
 
 typedef uint32_t FP16;
 
@@ -36,23 +34,15 @@ static inline uint16_t FP_frac(FP16 a, uint32_t precision) {
     return (uint16_t) ((((uint64_t) a & MASK) * precision) >> SHIFT);
 }
 
-static inline void FP_format(char* buf, FP16 a, uint32_t precision) {
+static inline void FP_format(char* buf, uint32_t len, FP16 a, uint32_t precision) {
     const uint16_t d = FP_decimal(a);
     const uint16_t f = FP_frac(a, precision);
     if ((a & MASK) < ONE / 100) {
-        int32_t w = nformat_u32(buf, 50, d);
-        buf[w] = '.';
-        buf[w+1] = '0';
-        buf[w+2] = '0';
+        nformat_u32s(buf, len, "%.00", d);
     } else if ((a & MASK) < ONE / 10) {
-        int32_t w = nformat_u32(buf, 50, d);
-        buf[w] = '.';
-        buf[w+1] = '0';
-        nformat_u32(buf, 50-((uint32_t)w+2), f);
+        nformat_u32s(buf, len, "%.0%", d, f);
     } else {
-        int32_t w = nformat_u32(buf, 50, d);
-        buf[w] = '.';
-        nformat_u32(buf, 50-((uint32_t)w+1), f);
+        nformat_u32s(buf, len, "%.%", d, f);
     }
 }
 

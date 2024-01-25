@@ -6,6 +6,7 @@
 #include "temperature.h"
 
 #include <stdint.h>
+#include <string.h>
 
 static void oven_start(void);
 static void oven_stop(void);
@@ -60,8 +61,8 @@ static volatile int32_t last_error = 0;
 static volatile int32_t d_error_ = 0;
 
 // TODO: set a max a value for integral_error
-#define INTEGRAL_ERROR_LEN 32
-#define MAX_INTEGRAL_ERROR 1000
+#define INTEGRAL_ERROR_LEN 16
+#define MAX_INTEGRAL_ERROR 500
 static volatile int32_t integral_error = 0;
 static volatile int32_t ie_buf[INTEGRAL_ERROR_LEN] = { 0 };
 static volatile uint32_t ie_index = 0;
@@ -69,6 +70,9 @@ static volatile uint32_t ie_index = 0;
 static void oven_start(void) {
     last_error = 0;
     integral_error = 0;
+    memset((void*)ie_buf, 0, sizeof(ie_buf));
+    ie_index = 0;
+
     Oven_set_target(0);
     BSP_Power_set(0);
     BSP_T_start();
@@ -132,7 +136,7 @@ void Oven_control(uint16_t current_temp) {
 
     last_error = error;
     ie_buf[ie_index] = error;
-    ie_index = (ie_index + 1) & (INTEGRAL_ERROR_LEN - 1);
+    ie_index = MOD_POW2(ie_index+1, INTEGRAL_ERROR_LEN);
 }
 
 void Oven_set_target(uint16_t target) {
