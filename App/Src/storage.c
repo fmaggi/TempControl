@@ -13,13 +13,13 @@ FLASH_STORAGE struct Data data;
 
 void Storage_get_curve(uint32_t index, Curve* curve) {
     if (index >= NUM_CURVES) return;
-    memcpy(curve, &data.curves[index], sizeof(CurveRunner));
+    memcpy(curve, &data.curves[index], sizeof(Curve));
 }
 
 void Storage_set_curve(uint32_t index, const Curve* curve) {
     struct Data temp;    
     memcpy(&temp, &data, sizeof(struct Data));
-    memcpy(&temp.curves[index], curve, sizeof(CurveRunner));
+    memcpy(&temp.curves[index], curve, sizeof(Curve));
     BSP_Flash_write(&data, sizeof(struct Data) / sizeof(uint32_t), (uint32_t*)&temp);
 }
 

@@ -7,6 +7,24 @@
 #include "temperature.h"
 
 #include <stdint.h>
+#include <string.h>
+
+PID pid = { 0 };
+
+static volatile uint16_t temp = 0;
+static volatile uint16_t target_temp = 0;
+
+#define MAX_INITIAL_ERROR  3
+#define INTEGRAL_ERROR_LEN 16
+#define MAX_INTEGRAL_ERROR 1000
+
+static volatile int32_t i_error = 0;
+static volatile int32_t ie_buf[INTEGRAL_ERROR_LEN] = { 0 };
+static volatile uint8_t ie_index = 0;
+
+static volatile int32_t last_error = 0;
+
+static volatile int32_t d_error = 0;
 
 static void oven_start(void);
 static void oven_stop(void);
@@ -22,12 +40,32 @@ static void update_gradient(CurveRunner* r) {
 
 void Curve_start(CurveRunner* r, uint8_t curve_index) {
     r->index = 0;
+    r->ready = 0;
     Storage_get_curve(curve_index, &r->curve);
     update_gradient(r);
     Oven_set_target(r->curve.points[0].temperature);
     oven_start();
 }
 
+static void stabilize(CurveRunner* r) {
+    uint16_t error;
+    if (temp < target_temp) {
+        error = target_temp - temp;
+    } else {
+        error = temp - target_temp;
+    }
+
+    if (error > MAX_INITIAL_ERROR) {
+        return;
+    }
+
+    const uint16_t ierror = i_error < 0 ? (uint16_t) -i_error : (uint16_t) i_error;
+    if (ierror > MAX_INITIAL_ERROR) {
+        return;
+    }
+
+    r->ready = 1;
+}
 
 uint16_t Curve_target(const CurveRunner* r, uint16_t time) {
     CurvePoint point = r->curve.points[r->index];
@@ -36,10 +74,15 @@ uint16_t Curve_target(const CurveRunner* r, uint16_t time) {
     return point.temperature + FP_toInt(dT);
 }
 
-uint8_t Curve_step(CurveRunner* r, uint16_t time) {
+CurveState Curve_step(CurveRunner* r, uint16_t time) {
+    if (!r->ready) {
+        stabilize(r);
+        return PREP;
+    }
+
     if (r->index >= r->curve.length) {
         oven_stop();
-        return 1;
+        return DONE;
     }
 
     CurvePoint point = r->curve.points[r->index + 1];
@@ -51,53 +94,12 @@ uint8_t Curve_step(CurveRunner* r, uint16_t time) {
     uint16_t target = Curve_target(r, time);
     Oven_set_target(target);
 
-    return 0;
+    return RUN;
 }
-
-PID pid = { 0 };
-
-static volatile uint16_t temp = 0;
-static volatile uint16_t target_temp = 0;
-
-#define MAX_INITIAL_ERROR 3
-#define INTEGRAL_ERROR_LEN 16
-#define MAX_INTEGRAL_ERROR 1000
-
-static volatile int32_t i_error = 0;
-static volatile int32_t ie_buf[INTEGRAL_ERROR_LEN] = { 0 };
-static volatile uint8_t ie_index = 0;
-
-static volatile int32_t last_error = 0;
-
-static volatile int32_t d_error = 0;
 
 static void oven_start(void) {
-    last_error = 0;
-    i_error = 0;
-    Oven_set_target(0);
-    BSP_Power_set(0);
     BSP_T_start();
     BSP_Power_start();
-}
-
-uint8_t Oven_ready(void) {
-    uint16_t error;
-    if (temp < target_temp) {
-        error = target_temp - temp;
-    } else {
-        error = temp - target_temp;
-    }
-
-    if (error > MAX_INITIAL_ERROR) {
-        return 1;
-    }
-
-    const uint16_t ierror = i_error < 0 ? (uint16_t) -i_error : (uint16_t)i_error;
-    if (ierror > MAX_INITIAL_ERROR) {
-        return 1;
-    }
-
-    return 0;
 }
 
 PID Oven_get_PID(void) {
@@ -109,7 +111,13 @@ void Oven_set_PID(PID pid_) {
 }
 
 static void oven_stop(void) {
+    last_error = 0;
+    i_error = 0;
+    d_error = 0;
+    memset((void*)ie_buf, 0, sizeof(ie_buf));
+    ie_index = 0;
     Oven_set_target(0);
+    BSP_Power_set(0);
     BSP_Power_stop();
     BSP_T_stop();
 }
