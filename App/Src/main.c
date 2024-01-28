@@ -243,24 +243,26 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
     static enum Command com = 0;
 
     if (first_entry) {
-        set_point_buf[13] = '0';
-
         char title[] = "Curva 0";
         title[6] = '0' + curve_index + 1;
         UI_Enter(&ui, title);
 
-        Storage_get_curve(curve_index, &r.curve);
-        Curve_start(&r);
+        Curve_start(&r, curve_index);
 
         com = ZERO;
         BSP_Comms_receive_expect((uint8_t*) &com, 1);
-
         start_time = BSP_millis();
     }
 
     uint32_t current_time = BSP_millis();
     uint16_t elapsed_seconds = (uint16_t) ((current_time - start_time) / 1000);
-    uint8_t stop = Curve_step(&r, elapsed_seconds);
+    uint8_t stop = 0;
+    if (!Oven_ready()) {
+        // wait for oven to stabilize around staring temp
+        start_time = current_time;
+    } else {
+        stop = Curve_step(&r, elapsed_seconds);
+    }
 
     uint16_t target = Oven_target();;
     ON_CHANGE(target, {

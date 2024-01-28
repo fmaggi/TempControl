@@ -3,10 +3,10 @@
 #include "bsp.h"
 #include "fp16.h"
 #include "power.h"
+#include "storage.h"
 #include "temperature.h"
 
 #include <stdint.h>
-#include <string.h>
 
 static void oven_start(void);
 static void oven_stop(void);
@@ -20,11 +20,14 @@ static void update_gradient(CurveRunner* r) {
     r->gradient = dtemp / dtime;
 }
 
-void Curve_start(CurveRunner* curve) {
-    curve->index = 0;
-    update_gradient(curve);
+void Curve_start(CurveRunner* r, uint8_t curve_index) {
+    r->index = 0;
+    Storage_get_curve(curve_index, &r->curve);
+    update_gradient(r);
+    Oven_set_target(r->curve.points[0].temperature);
     oven_start();
 }
+
 
 uint16_t Curve_target(const CurveRunner* r, uint16_t time) {
     CurvePoint point = r->curve.points[r->index];
@@ -56,27 +59,45 @@ PID pid = { 0 };
 static volatile uint16_t temp = 0;
 static volatile uint16_t target_temp = 0;
 
+#define MAX_INITIAL_ERROR 3
+#define INTEGRAL_ERROR_LEN 16
+#define MAX_INTEGRAL_ERROR 1000
+
+static volatile int32_t i_error = 0;
+static volatile int32_t ie_buf[INTEGRAL_ERROR_LEN] = { 0 };
+static volatile uint8_t ie_index = 0;
+
 static volatile int32_t last_error = 0;
 
-static volatile int32_t d_error_ = 0;
-
-// TODO: set a max a value for integral_error
-#define INTEGRAL_ERROR_LEN 16
-#define MAX_INTEGRAL_ERROR 500
-static volatile int32_t integral_error = 0;
-static volatile int32_t ie_buf[INTEGRAL_ERROR_LEN] = { 0 };
-static volatile uint32_t ie_index = 0;
+static volatile int32_t d_error = 0;
 
 static void oven_start(void) {
     last_error = 0;
-    integral_error = 0;
-    memset((void*)ie_buf, 0, sizeof(ie_buf));
-    ie_index = 0;
-
+    i_error = 0;
     Oven_set_target(0);
     BSP_Power_set(0);
     BSP_T_start();
     BSP_Power_start();
+}
+
+uint8_t Oven_ready(void) {
+    uint16_t error;
+    if (temp < target_temp) {
+        error = target_temp - temp;
+    } else {
+        error = temp - target_temp;
+    }
+
+    if (error > MAX_INITIAL_ERROR) {
+        return 1;
+    }
+
+    const uint16_t ierror = i_error < 0 ? (uint16_t) -i_error : (uint16_t)i_error;
+    if (ierror > MAX_INITIAL_ERROR) {
+        return 1;
+    }
+
+    return 0;
 }
 
 PID Oven_get_PID(void) {
@@ -96,8 +117,8 @@ static void oven_stop(void) {
 struct Error Oven_error(void) {
     struct Error e;
     e.p = last_error;
-    e.i = integral_error;
-    e.d = d_error_;
+    e.i = i_error;
+    e.d = d_error;
     return e;
 }
 
@@ -114,18 +135,17 @@ void Oven_control(uint16_t current_temp) {
 
     int32_t error = (int32_t) target_temp - (int32_t) current_temp;
 
-    int32_t d_error = error - last_error;
-    d_error_ = d_error;
+    d_error = error - last_error;
 
-    integral_error -= ie_buf[ie_index];
-    integral_error += error;
+    i_error -= ie_buf[ie_index];
+    i_error += error;
 
-    integral_error = integral_error > MAX_INTEGRAL_ERROR ? MAX_INTEGRAL_ERROR : integral_error;
-    integral_error = integral_error < -MAX_INTEGRAL_ERROR ? -MAX_INTEGRAL_ERROR : integral_error;
+    i_error = i_error > MAX_INTEGRAL_ERROR ? MAX_INTEGRAL_ERROR : i_error;
+    i_error = i_error < -MAX_INTEGRAL_ERROR ? -MAX_INTEGRAL_ERROR : i_error;
 
     int32_t total_error = 0;
     total_error += (int32_t) pid.p * error;
-    total_error += (int32_t) pid.i * integral_error;
+    total_error += (int32_t) pid.i * i_error;
     total_error += (int32_t) pid.d * d_error;
 
     FP16 uv = total_error > 0 ? (FP16) total_error : 0;
@@ -136,7 +156,7 @@ void Oven_control(uint16_t current_temp) {
 
     last_error = error;
     ie_buf[ie_index] = error;
-    ie_index = MOD_POW2(ie_index+1, INTEGRAL_ERROR_LEN);
+    ie_index = (ie_index + 1) & (INTEGRAL_ERROR_LEN - 1);
 }
 
 void Oven_set_target(uint16_t target) {

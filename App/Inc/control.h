@@ -24,7 +24,7 @@ typedef struct {
 } CurveRunner;
 
 // curve points must already be set
-void Curve_start(CurveRunner* curve);
+void Curve_start(CurveRunner* curve, uint8_t curve_index);
 uint8_t Curve_step(CurveRunner* curve, uint16_t time);
 
 typedef union {
@@ -38,6 +38,7 @@ typedef union {
 PID Oven_get_PID(void);
 void Oven_set_PID(PID pid);
 
+uint8_t Oven_ready(void);
 uint16_t Oven_target(void);
 uint16_t Oven_temperature(void);
 
