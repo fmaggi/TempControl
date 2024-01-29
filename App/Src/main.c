@@ -13,6 +13,16 @@
 #include <stdio.h>
 #include <string.h>
 
+// NOTE: I think this is a bit cursed
+#define ON_CHANGE(var, action)                                                                                                 \
+    do {                                                                                                                       \
+        static uint32_t _last_##var = 0;                                                                                       \
+        if (_last_##var != (uint32_t) var) {                                                                                   \
+            _last_##var = (uint32_t) var;                                                                                      \
+            action;                                                                                                            \
+        }                                                                                                                      \
+    } while (0)
+
 enum Command {
     ZERO = 0x0,
     Talk = 0xAA,
@@ -47,7 +57,7 @@ static AppState main_menu(uint8_t first_entry, uint8_t* curve_index) {
 
     UI_Move_cursor(&menu);
 
-    if (UI_Selected(&menu)) {
+    if (UI_Select(&menu)) {
         BSP_Comms_abort();
         switch (menu.pos) {
             case 0: return MEASURE_T;
@@ -86,7 +96,7 @@ static AppState external_control(uint8_t first_entry, uint8_t* curve_index) {
             case CurveSet: {
                 uint8_t index = 0;
                 BSP_Comms_receive_block(&index, 1);
-                Curve curve = {0};
+                Curve curve = { 0 };
                 BSP_Comms_receive_block(&curve.length, 1);
                 BSP_Comms_receive_block((uint8_t*) curve.points, sizeof(CurvePoint) * curve.length);
                 Storage_set_curve(index, &curve);
@@ -96,7 +106,7 @@ static AppState external_control(uint8_t first_entry, uint8_t* curve_index) {
             case CurveSend: {
                 uint8_t index = 0;
                 BSP_Comms_receive_block(&index, 1);
-                Curve curve = {0};
+                Curve curve = { 0 };
                 Storage_get_curve(index, &curve);
                 BSP_Comms_transmit_block((uint8_t*) &curve.length, 1);
                 BSP_Comms_transmit_block((uint8_t*) curve.points, sizeof(CurvePoint) * curve.length);
@@ -128,7 +138,7 @@ static AppState external_control(uint8_t first_entry, uint8_t* curve_index) {
             case Stop: return MAIN_MENU;
             default: {
                 char err[50] = "Unknown message";
-                nformat_u32s(err+15, 50-15, "%", command);
+                nformat_u32s(err + 15, 50 - 15, "%", command);
                 Error_Handler(err);
             }
         }
@@ -156,56 +166,62 @@ static AppState edit_pid(uint8_t first_entry) {
         UI_Enter(&menu, "Editar PID");
     }
 
-    uint8_t clicked = UI_Selected(&menu);
-    uint8_t index = menu.selected;
-    if (clicked) {
-        if (menu.selected == 3) {
-            Storage_set_PID(pid);
-            return MAIN_MENU;
-        } else {
-            if (index == 1) {
-                BSP_IO_set_rotary(pid.coeffs[index] << 8);
-            } else {
-                BSP_IO_set_rotary(FP_toInt(pid.coeffs[index]));
+    // P and D will have a step of 1 per rotary click. That's why we convert it back to ints.
+    // I in the PID has to be < 1. So we have to handle it different.
+    // I have to think about it
+    if (UI_Select(&menu)) {
+        uint32_t value = 0;
+        switch (menu.selected) {
+            case 0: value = FP_toInt(pid.p); break;
+            case 1: value = (uint32_t) (pid.i >> 8); break;
+            case 2: value = FP_toInt(pid.d); break;
+            case 3: {
+                Storage_set_PID(pid);
+                return MAIN_MENU;
             }
+            default: break;
         }
+        BSP_IO_set_rotary(value);
     }
 
-    if (menu.selected == UI_UNSELECTED) {
-        UI_Move_cursor(&menu);
-    } else {
-        FP16 val_fp;
-        if (index == 1) {
-            uint32_t val = BSP_IO_get_rotary(0, UINT32_MAX);
-            val_fp = (FP16) val << 8; // I coeff needs to be small in comparison to others, so we cast
-        } else {
-            uint16_t val = (uint16_t) BSP_IO_get_rotary(0, UINT16_MAX);
-            val_fp = FP_fromInt(val);
+    uint32_t v = BSP_IO_get_rotary(0, UINT32_MAX);
+    switch (menu.selected) {
+        case 0: {
+            FP16 p = FP_fromInt((uint16_t) v);
+            ON_CHANGE(p, {
+                pid.p = p;
+                FP_format((char*) p_buf + 2, 28, p, 1000);
+                UI_Update_entry(&menu, 0, 2);
+            });
+            UI_Unselect(&menu);
+            break;
         }
-
-        if (val_fp != pid.coeffs[index]) {
-            pid.coeffs[index] = val_fp;
-            FP_format((char*) menu_entries[index] + 2, 28, val_fp, 1000);
-            UI_Update_entry(&menu, index, 2);
+        case 1: {
+            FP16 i = (FP16) (v << 8);
+            ON_CHANGE(i, {
+                pid.i = i;
+                FP_format((char*) i_buf + 2, 28, i, 1000);
+                UI_Update_entry(&menu, 1, 2);
+            });
+            UI_Unselect(&menu);
+            break;
         }
-
-        if (UI_Unselected(&menu)) {
-            Oven_set_PID(pid);
+        case 2: {
+            FP16 d = FP_fromInt((uint16_t) v);
+            ON_CHANGE(d, {
+                pid.d = d;
+                FP_format((char*) d_buf + 2, 28, d, 1000);
+                UI_Update_entry(&menu, 2, 2);
+            });
+            UI_Unselect(&menu);
+            break;
         }
+        case UI_UNSELECTED:
+        default: UI_Move_cursor(&menu); break;
     }
 
     return PID_EDIT;
 }
-
-// NOTE: I think this is a bit cursed
-#define ON_CHANGE(var, action)                                                                                                 \
-    do {                                                                                                                       \
-        static uint32_t _last_##var = 0;                                                                                       \
-        if (_last_##var != (uint32_t) var) {                                                                                   \
-            _last_##var = (uint32_t) var;                                                                                      \
-            action;                                                                                                            \
-        }                                                                                                                      \
-    } while (0)
 
 static AppState measure_temp(uint8_t first_entry) {
     static char measurement[50] = "T(C)=";
@@ -219,7 +235,7 @@ static AppState measure_temp(uint8_t first_entry) {
 
     uint16_t t = Oven_temperature();
     ON_CHANGE(t, {
-        nformat_u32s(measurement+5, 50-5, "%", t);
+        nformat_u32s(measurement + 5, 50 - 5, "%", t);
         UI_Update_entry(&ui, 0, 5);
     });
 
@@ -232,6 +248,13 @@ static AppState measure_temp(uint8_t first_entry) {
 }
 
 static AppState curve(uint8_t first_entry, uint8_t curve_index) {
+#define STOP()                                                                                                                 \
+    do {                                                                                                                       \
+        const uint16_t ending = 0xABAB;                                                                                        \
+        BSP_Comms_transmit_block((uint8_t*) &ending, sizeof(uint16_t));                                                        \
+        return MAIN_MENU;                                                                                                      \
+    } while (0)
+
     static char set_point_buf[50] = "Set point(C)=";
     static char temp_buf[50] = "T(C)=";
     static const char* menu_entries[] = { set_point_buf, temp_buf, "< Volver" };
@@ -253,21 +276,22 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
 
     uint32_t current_time = BSP_millis();
     uint16_t elapsed_seconds = (uint16_t) ((current_time - start_time) / 1000);
-    CurveState cs = Curve_step(&r, elapsed_seconds);
-    if (cs == PREP) {
-        // wait for oven to stabilize around staring temp
-        start_time = current_time;
+
+    switch (Curve_step(&r, elapsed_seconds)) {
+        case PREP: start_time = current_time; break;
+        case RUN: break;
+        case DONE: STOP();
     }
 
-    uint16_t target = Oven_target();;
+    uint16_t target = Oven_target();
     ON_CHANGE(target, {
-        nformat_u32s(set_point_buf+13, 50-13, "%", target);
+        nformat_u32s(set_point_buf + 13, 50 - 13, "%", target);
         UI_Update_entry(&ui, 0, 13);
     });
 
     uint16_t temp = Oven_temperature();
     ON_CHANGE(temp, {
-        nformat_u32s(temp_buf+5, 50-5, "%", temp);
+        nformat_u32s(temp_buf + 5, 50 - 5, "%", temp);
         UI_Update_entry(&ui, 1, 5);
     });
 
@@ -280,22 +304,11 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
         BSP_Comms_transmit((uint8_t*) data, sizeof(uint16_t) * 4);
     });
 
-    uint8_t stop = cs == DONE;
-    if (UI_Selected(&ui)) {
-        stop = ui.selected == ui.num - 1;
-    }
-
-    if (ui.selected == UI_UNSELECTED) {
-        UI_Move_cursor(&ui);
-    } else {
-        UI_Unselected(&ui);
-    }
-
-    if (stop) {
-        const uint16_t ending = 0xABAB;
-        BSP_Comms_transmit_block((uint8_t*) &ending, sizeof(uint16_t));
-        BSP_Comms_abort();
-        return MAIN_MENU;
+    UI_Select(&ui);
+    switch (ui.selected) {
+        case 2: STOP();
+        case UI_UNSELECTED: UI_Move_cursor(&ui); break;
+        default: UI_Unselect(&ui); break;
     }
 
 #define SHOWERR
@@ -315,6 +328,8 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
         #endif
     #endif
 #endif
+
+#undef STOP
 
     return CURVE;
 }
@@ -343,7 +358,5 @@ int main(void) {
 
         changed_state = next_state != current_state;
         current_state = next_state;
-
-        /* BSP_delay(10); */
     }
 }

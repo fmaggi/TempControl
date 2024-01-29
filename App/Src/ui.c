@@ -87,7 +87,7 @@ void UI_Move_highlight(struct UI* ui, uint8_t to) {
     write_menu_entry(ui->entries, to, HL_COLOR);
 }
 
-uint8_t UI_Selected(struct UI* ui) {
+uint8_t UI_Select(struct UI* ui) {
     if (ui->selected != UI_UNSELECTED) {
         return 0;
     }
@@ -101,7 +101,7 @@ uint8_t UI_Selected(struct UI* ui) {
     return ok;
 }
 
-uint8_t UI_Unselected(struct UI* ui) {
+uint8_t UI_Unselect(struct UI* ui) {
     if (ui->selected == UI_UNSELECTED) {
         return 0;
     }

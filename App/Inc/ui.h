@@ -32,8 +32,8 @@ void UI_Write(const struct UI* ui);
 void UI_Update_entry(const struct UI* ui, uint8_t entry, uint8_t from);
 void UI_Update_entry2(const struct UI* ui, uint8_t entry, uint8_t from, const char* fmt, ...);
 void UI_Move_highlight(struct UI* ui, uint8_t to);
-uint8_t UI_Selected(struct UI* ui);
-uint8_t UI_Unselected(struct UI* ui);
+uint8_t UI_Select(struct UI* ui);
+uint8_t UI_Unselect(struct UI* ui);
 void UI_Move_cursor(struct UI* ui);
 
 #endif // !_UI_H
