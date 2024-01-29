@@ -30,19 +30,24 @@ static inline uint16_t FP_decimal(FP16 a) {
     return FP_toInt(a);
 }
 
-static inline uint16_t FP_frac(FP16 a, uint32_t precision) {
-    return (uint16_t) ((((uint64_t) a & MASK) * precision) >> SHIFT);
+static inline uint16_t FP_frac(FP16 a) {
+    return (uint16_t) (a & MASK);
+}
+
+static inline uint16_t FP_frac_as_int(FP16 a, uint32_t precision) {
+    return (uint16_t) ((((uint64_t) FP_frac(a)) * precision) >> SHIFT);
 }
 
 static inline void FP_format(char* buf, uint32_t len, FP16 a, uint32_t precision) {
     const uint16_t d = FP_decimal(a);
-    const uint16_t f = FP_frac(a, precision);
-    if ((a & MASK) < ONE / 100) {
-        nformat_u32s(buf, len, "%.00", d);
-    } else if ((a & MASK) < ONE / 10) {
-        nformat_u32s(buf, len, "%.0%", d, f);
+    const uint16_t f = FP_frac(a);
+    const uint16_t fi = FP_frac_as_int(a, precision);
+    if (f >= ONE / 10) {
+        nformat_u32s(buf, len, "%.%", d, fi);
+    } else if (f >= ONE / 100) {
+        nformat_u32s(buf, len, "%.0%", d, fi);
     } else {
-        nformat_u32s(buf, len, "%.%", d, f);
+        nformat_u32s(buf, len, "%.00", d);
     }
 }
 
