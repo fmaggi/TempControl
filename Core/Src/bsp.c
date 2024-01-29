@@ -17,7 +17,9 @@ extern uint32_t _user_data_end;
 void SystemClock_Config(void);
 
 void BSP_init(void) {
-    HAL_Init();
+    if (HAL_Init() == HAL_ERROR) {
+        while(1){}
+    }
 
     SystemClock_Config();
 
