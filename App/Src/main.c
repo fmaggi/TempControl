@@ -138,7 +138,7 @@ static AppState external_control(uint8_t first_entry, uint8_t* curve_index) {
             case Stop: return MAIN_MENU;
             default: {
                 char err[50] = "Unknown message";
-                nformat_u32s(err + 15, 50 - 15, "%", command);
+                nformat_u32s(err + 15, 50 - 15 - 1, "%", command);
                 Error_Handler(err);
             }
         }
@@ -235,7 +235,7 @@ static AppState measure_temp(uint8_t first_entry) {
 
     uint16_t t = Oven_temperature();
     ON_CHANGE(t, {
-        nformat_u32s(measurement + 5, 50 - 5, "%", t);
+        nformat_u32s(measurement + 5, 50 - 5 - 1, "%", t);
         UI_Update_entry(&ui, 0, 5);
     });
 
@@ -285,13 +285,13 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
 
     uint16_t target = Oven_target();
     ON_CHANGE(target, {
-        nformat_u32s(set_point_buf + 13, 50 - 13, "%", target);
+        nformat_u32s(set_point_buf + 13, 50 - 13 - 1, "%", target);
         UI_Update_entry(&ui, 0, 13);
     });
 
     uint16_t temp = Oven_temperature();
     ON_CHANGE(temp, {
-        nformat_u32s(temp_buf + 5, 50 - 5, "%", temp);
+        nformat_u32s(temp_buf + 5, 50 - 5 - 1, "%", temp);
         UI_Update_entry(&ui, 1, 5);
     });
 
@@ -316,13 +316,13 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
     char _debugbuf[20] = { 0 };
     #ifdef SHOWPOWER
     struct PowerState power_state = BSP_Power_get();
-    nformat_u32s(_debugbuf, 20, "% % %", power_state.power, power_state.period1, power_state.period2);
+    nformat_u32s(_debugbuf, 20-1, "% % %", power_state.power, power_state.period1, power_state.period2);
     BSP_Display_write_text("AAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
     BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
     #else
         #ifdef SHOWERR
     struct Error e = Oven_error();
-    nformat_i32s(_debugbuf, 20, "% % % %", e.p, e.i, e.d, r.gradient);
+    nformat_i32s(_debugbuf, 20-1, "% % % %", e.p, e.i, e.d, r.gradient);
     BSP_Display_write_text("AAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
     BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
         #endif

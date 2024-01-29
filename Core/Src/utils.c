@@ -24,9 +24,7 @@ int32_t nformat_i32s(char* buf, uint32_t len, const char* fmt, ...) {
         cur++;
     }
 
-    for (uint32_t i = written; i < len; ++i) {
-        buf[i] = 0;
-    }
+    buf[written] = 0;
 
     return (int32_t)written;
 
@@ -54,9 +52,7 @@ int32_t nformat_u32s(char* buf, uint32_t len, const char* fmt, ...) {
         cur++;
     }
 
-    for (uint32_t i = written; i < len; ++i) {
-        buf[i] = 0;
-    }
+    buf[written] = 0;
 
     return (int32_t)written;
 }
@@ -64,6 +60,7 @@ int32_t nformat_u32s(char* buf, uint32_t len, const char* fmt, ...) {
 int32_t nformat_u32(char* buf, uint32_t len, uint32_t value) {
     if (value == 0) {
         buf[0] = '0';
+        buf[1] = 0;
         return 1;
     }
 
@@ -79,7 +76,8 @@ int32_t nformat_u32(char* buf, uint32_t len, uint32_t value) {
         written += 1;
     }
 
-    if (len < (uint32_t)written) {
+    if (value != 0) {
+        // This means that we failed to write the complete number into the buffer
         return -1;
     }
 
