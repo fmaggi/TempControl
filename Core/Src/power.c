@@ -32,6 +32,7 @@ void BSP_Power_init(void) {
     TIM_FREEZE_DBG();
     HAL_GPIO_WritePin(Triac1_GPIO_Port, Triac1_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(Triac2_GPIO_Port, Triac2_Pin, GPIO_PIN_RESET);
+    BSP_Power_stop();
 }
 
 void BSP_Power_start(void) {

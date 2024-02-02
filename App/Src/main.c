@@ -176,6 +176,7 @@ static AppState edit_pid(uint8_t first_entry) {
             case 1: value = (uint32_t) (pid.i >> 8); break;
             case 2: value = FP_toInt(pid.d); break;
             case 3: {
+                Oven_set_PID(pid);
                 Storage_set_PID(pid);
                 return MAIN_MENU;
             }
@@ -184,10 +185,10 @@ static AppState edit_pid(uint8_t first_entry) {
         BSP_IO_set_rotary(value);
     }
 
-    uint32_t v = BSP_IO_get_rotary(0, UINT32_MAX);
     switch (menu.selected) {
         case 0: {
-            FP16 p = FP_fromInt((uint16_t) v);
+            uint16_t v = (uint16_t)BSP_IO_get_rotary(0, UINT16_MAX);
+            FP16 p = FP_fromInt(v);
             ON_CHANGE(p, {
                 pid.p = p;
                 FP_format((char*) p_buf + 2, 28, p, 1000);
@@ -197,6 +198,7 @@ static AppState edit_pid(uint8_t first_entry) {
             break;
         }
         case 1: {
+            uint32_t v = BSP_IO_get_rotary(0, UINT32_MAX);
             FP16 i = (FP16) (v << 8);
             ON_CHANGE(i, {
                 pid.i = i;
@@ -207,7 +209,8 @@ static AppState edit_pid(uint8_t first_entry) {
             break;
         }
         case 2: {
-            FP16 d = FP_fromInt((uint16_t) v);
+            uint16_t v = (uint16_t)BSP_IO_get_rotary(0, UINT16_MAX);
+            FP16 d = FP_fromInt(v);
             ON_CHANGE(d, {
                 pid.d = d;
                 FP_format((char*) d_buf + 2, 28, d, 1000);
@@ -311,22 +314,26 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
         default: UI_Unselect(&ui); break;
     }
 
-#define SHOWERR
 #ifdef DEBUG
     char _debugbuf[20] = { 0 };
-    #ifdef SHOWPOWER
+
+#if 0
     struct PowerState power_state = BSP_Power_get();
-    nformat_u32s(_debugbuf, 20-1, "% % %", power_state.power, power_state.period1, power_state.period2);
-    BSP_Display_write_text("AAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
-    BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
-    #else
-        #ifdef SHOWERR
+    nformat_u32s(_debugbuf, 20 - 1, "% % %", power_state.power, power_state.period1, power_state.period2);
+#endif
+
+#if 0
     struct Error e = Oven_error();
-    nformat_i32s(_debugbuf, 20-1, "% % % %", e.p, e.i, e.d, r.gradient);
+    nformat_i32s(_debugbuf, 20 - 1, "% % % %", e.p, e.i, e.d, r.gradient);
+#endif
+
+#if 1
+    nformat_u32s(_debugbuf, 20-1, "% %", r.index, r.curve.length);
+#endif
+
     BSP_Display_write_text("AAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
     BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
-        #endif
-    #endif
+
 #endif
 
 #undef STOP
@@ -337,7 +344,7 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
 #undef ON_CHANGE
 
 int main(void) {
-    BSP_init();
+    BSP_init(T_SAMPLE_PERIOD_ms);
     Oven_set_PID(Storage_get_PID());
 
     AppState current_state = MAIN_MENU;
