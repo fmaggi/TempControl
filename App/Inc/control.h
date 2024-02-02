@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 
+#define T_SAMPLE_PERIOD_ms 100
 #define MAX_CURVE_LENGTH 50
 
 typedef struct {

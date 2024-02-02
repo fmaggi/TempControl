@@ -4,6 +4,7 @@
 #include "stm32f1xx_hal_cortex.h"
 #include "stm32f1xx_hal_flash.h"
 #include "stm32f1xx_hal_flash_ex.h"
+#include "stm32f1xx_hal_gpio.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -16,16 +17,16 @@ extern uint32_t _user_data_end;
 
 void SystemClock_Config(void);
 
-void BSP_init(void) {
+void BSP_init(uint32_t T_sample_period_ms) {
     if (HAL_Init() == HAL_ERROR) {
-        while(1){}
+        while (1) {}
     }
 
     SystemClock_Config();
 
     BSP_Display_init();
     BSP_Power_init();
-    BSP_T_init(100);
+    BSP_T_init(T_sample_period_ms);
     BSP_IO_init();
 }
 
@@ -37,7 +38,7 @@ uint32_t BSP_millis(void) {
     return HAL_GetTick();
 }
 
-void BSP_Flash_write(void* address_start, uint32_t numberofwords, uint32_t* data) {
+void BSP_Flash_write(uint32_t* address_start, uint32_t numberofwords, uint32_t* data) {
     static FLASH_EraseInitTypeDef EraseInitStruct;
     uint32_t PAGEError = 0;
 
@@ -51,11 +52,12 @@ void BSP_Flash_write(void* address_start, uint32_t numberofwords, uint32_t* data
         Error_Handler("Flash PageErase");
     }
 
+    uint32_t* address = address_start;
     for (uint32_t i = 0; i < numberofwords; ++i) {
-        uint32_t address = (uint32_t) address_start + i * 4;
-        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, data[i]) != HAL_OK) {
+        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, (uint32_t) address, data[i]) != HAL_OK) {
             Error_Handler("Flash Program");
         }
+        address++;
     }
 
     HAL_FLASH_Lock();
@@ -126,7 +128,9 @@ __weak void Error_Handler(const char* msg) {
     BSP_Display_write_text(msg, 0, 0, FONT3, WHITE, RED);
 
     for (;;) {
-        if (BSP_IO_ok_clicked()) {
+        // NOTE: IRQs do not work in here so we need to poll the pin directly
+        if (HAL_GPIO_ReadPin(Ok_GPIO_Port, Ok_Pin) == GPIO_PIN_RESET) {
+            BSP_Display_clear(YELLOW);
             HAL_NVIC_SystemReset();
         }
     }

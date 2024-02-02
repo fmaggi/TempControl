@@ -10,6 +10,7 @@
 #include <string.h>
 
 PID pid = { 0 };
+static const volatile FP16 dt = (ONE * T_SAMPLE_PERIOD_ms) / 1000;
 
 static volatile uint16_t temp = 0;
 static volatile uint16_t target_temp = 0;
@@ -153,8 +154,8 @@ void Oven_control(uint16_t current_temp) {
 
     int32_t total_error = 0;
     total_error += (int32_t) pid.p * error;
-    total_error += (int32_t) pid.i * i_error;
-    total_error += (int32_t) pid.d * d_error;
+    total_error += (int32_t) pid.i * i_error * (int32_t)dt;
+    total_error += (int32_t) pid.d * d_error / (int32_t)dt;
 
     FP16 uv = total_error > 0 ? (FP16) total_error : 0;
     uint32_t power = FP_toInt(uv);
