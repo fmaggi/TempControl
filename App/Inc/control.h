@@ -8,31 +8,25 @@
 #define T_SAMPLE_PERIOD_ms 100
 #define MAX_CURVE_LENGTH 50
 
-typedef struct {
+struct CurvePoint {
     uint16_t time_s;
     uint16_t temperature;
-} CurvePoint;
+};
 
-typedef struct {
-    CurvePoint points[MAX_CURVE_LENGTH];
+struct Curve {
+    struct CurvePoint points[MAX_CURVE_LENGTH];
     uint8_t length;
-} Curve;
+};
 
-typedef struct {
-    Curve curve;
+struct CurveRunner {
+    struct Curve curve;
     FP16 gradient;
     uint8_t index;
     uint8_t ready; // ready determines stabilization around first point
-} CurveRunner;
+};
 
-typedef enum {
-    PREP,
-    RUN,
-    DONE
-} CurveState;
-
-void Curve_start(CurveRunner* curve, uint8_t curve_index);
-CurveState Curve_step(CurveRunner* curve, uint16_t time);
+void Curve_start(struct CurveRunner* curve, uint8_t curve_index);
+uint8_t Curve_step(struct CurveRunner* curve, uint16_t time);
 
 typedef union {
     struct {

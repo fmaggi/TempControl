@@ -5,8 +5,8 @@
 
 #define NUM_CURVES 3
 
-void Storage_get_curve(uint32_t index, Curve* curve);
-void Storage_set_curve(uint32_t index, const Curve* curve);
+void Storage_get_curve(uint32_t index, struct Curve* curve);
+void Storage_set_curve(uint32_t index, const struct Curve* curve);
 
 PID Storage_get_PID(void);
 void Storage_set_PID(PID pid);
