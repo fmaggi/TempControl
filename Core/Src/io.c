@@ -75,20 +75,7 @@ void BSP_IO_Toggle_LED(void) {
     HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 }
 
-void BSP_Comms_abort(void) {
-    HAL_UART_Abort(&huart1);
-}
-
-void BSP_Comms_transmit_block(uint8_t* buf, uint16_t size) {
-    HAL_UART_Transmit(&huart1, buf, size, HAL_MAX_DELAY);
-}
-
-void BSP_Comms_transmit(uint8_t* buf, uint16_t size) {
-    HAL_UART_Transmit_IT(&huart1, buf, size);
-}
-
-void BSP_Comms_receive_block(uint8_t* buf, uint16_t size) {
-    const HAL_StatusTypeDef e = HAL_UART_Receive(&huart1, buf, size, HAL_MAX_DELAY - 1);
+static void UART_check(HAL_StatusTypeDef e) {
     switch (e) {
         case HAL_OK: return;
         case HAL_ERROR: Error_Handler("UART Error");
@@ -97,8 +84,25 @@ void BSP_Comms_receive_block(uint8_t* buf, uint16_t size) {
     }
 }
 
+void BSP_Comms_abort(void) {
+    received = 0;
+    UART_check(HAL_UART_Abort(&huart1));
+}
+
+void BSP_Comms_transmit_block(uint8_t* buf, uint16_t size) {
+    UART_check(HAL_UART_Transmit(&huart1, buf, size, HAL_MAX_DELAY));
+}
+
+void BSP_Comms_transmit(uint8_t* buf, uint16_t size) {
+    UART_check(HAL_UART_Transmit_IT(&huart1, buf, size));
+}
+
+void BSP_Comms_receive_block(uint8_t* buf, uint16_t size) {
+    UART_check(HAL_UART_Receive(&huart1, buf, size, HAL_MAX_DELAY - 1));
+}
+
 void BSP_Comms_receive_expect(uint8_t* buf, uint16_t size) {
-    HAL_UART_Receive_IT(&huart1, buf, size);
+    UART_check(HAL_UART_Receive_IT(&huart1, buf, size));
 }
 
 uint8_t BSP_Comms_received(void) {
