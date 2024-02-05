@@ -12,7 +12,6 @@ void BSP_T_start(void);
 void BSP_T_stop(void);
 
 // Implemented by user
-
 void BSP_T_on_conversion(uint32_t temperature);
 
 #ifdef __cplusplus
