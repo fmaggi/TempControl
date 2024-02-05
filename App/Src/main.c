@@ -96,9 +96,9 @@ static AppState external_control(uint8_t first_entry, uint8_t* curve_index) {
             case CurveSet: {
                 uint8_t index = 0;
                 BSP_Comms_receive_block(&index, 1);
-                Curve curve = { 0 };
+                struct Curve curve = { 0 };
                 BSP_Comms_receive_block(&curve.length, 1);
-                BSP_Comms_receive_block((uint8_t*) curve.points, sizeof(CurvePoint) * curve.length);
+                BSP_Comms_receive_block((uint8_t*) curve.points, sizeof(struct CurvePoint) * curve.length);
                 Storage_set_curve(index, &curve);
                 BSP_Display_write_text("Curve setted", 10, 10, MENU_FONT, BLACK, GREEN);
                 break;
@@ -106,10 +106,10 @@ static AppState external_control(uint8_t first_entry, uint8_t* curve_index) {
             case CurveSend: {
                 uint8_t index = 0;
                 BSP_Comms_receive_block(&index, 1);
-                Curve curve = { 0 };
+                struct Curve curve = { 0 };
                 Storage_get_curve(index, &curve);
                 BSP_Comms_transmit_block((uint8_t*) &curve.length, 1);
-                BSP_Comms_transmit_block((uint8_t*) curve.points, sizeof(CurvePoint) * curve.length);
+                BSP_Comms_transmit_block((uint8_t*) curve.points, sizeof(struct CurvePoint) * curve.length);
                 const uint16_t ending = 0xABAB;
                 BSP_Comms_transmit_block((uint8_t*) &ending, sizeof(uint16_t));
                 BSP_Display_write_text("Curve sent", 10, 10, MENU_FONT, BLACK, GREEN);
@@ -168,7 +168,6 @@ static AppState edit_pid(uint8_t first_entry) {
 
     // P and D will have a step of 1 per rotary click. That's why we convert it back to ints.
     // I in the PID has to be < 1. So we have to handle it different.
-    // I have to think about it
     if (UI_Select(&menu)) {
         uint32_t value = 0;
         switch (menu.selected) {
@@ -187,7 +186,7 @@ static AppState edit_pid(uint8_t first_entry) {
 
     switch (menu.selected) {
         case 0: {
-            uint16_t v = (uint16_t)BSP_IO_get_rotary(0, UINT16_MAX);
+            uint16_t v = (uint16_t) BSP_IO_get_rotary(0, UINT16_MAX);
             FP16 p = FP_fromInt(v);
             ON_CHANGE(p, {
                 pid.p = p;
@@ -209,7 +208,7 @@ static AppState edit_pid(uint8_t first_entry) {
             break;
         }
         case 2: {
-            uint16_t v = (uint16_t)BSP_IO_get_rotary(0, UINT16_MAX);
+            uint16_t v = (uint16_t) BSP_IO_get_rotary(0, UINT16_MAX);
             FP16 d = FP_fromInt(v);
             ON_CHANGE(d, {
                 pid.d = d;
@@ -238,7 +237,7 @@ static AppState measure_temp(uint8_t first_entry) {
 
     uint16_t t = Oven_temperature();
     ON_CHANGE(t, {
-        nformat_u32s(measurement + 5, 50 - 5 - 1, "%", t);
+        nformat_u32(measurement+5, 50-5-1, t);
         UI_Update_entry(&ui, 0, 5);
     });
 
@@ -265,7 +264,7 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
 
     static uint32_t start_time = 0;
 
-    static CurveRunner r = { 0 };
+    static struct CurveRunner r = { 0 };
 
     if (first_entry) {
         char title[] = "Curva 0";
@@ -280,21 +279,19 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
     uint32_t current_time = BSP_millis();
     uint16_t elapsed_seconds = (uint16_t) ((current_time - start_time) / 1000);
 
-    switch (Curve_step(&r, elapsed_seconds)) {
-        case PREP: start_time = current_time; break;
-        case RUN: break;
-        case DONE: STOP();
+    if (Curve_step(&r, elapsed_seconds)) {
+        STOP();
     }
 
     uint16_t target = Oven_target();
     ON_CHANGE(target, {
-        nformat_u32s(set_point_buf + 13, 50 - 13 - 1, "%", target);
+        nformat_u32(set_point_buf+13, 50-13-1, target);
         UI_Update_entry(&ui, 0, 13);
     });
 
     uint16_t temp = Oven_temperature();
     ON_CHANGE(temp, {
-        nformat_u32s(temp_buf + 5, 50 - 5 - 1, "%", temp);
+        nformat_u32(temp_buf+5, 50-5-1, temp);
         UI_Update_entry(&ui, 1, 5);
     });
 
@@ -317,22 +314,25 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
 #ifdef DEBUG
     char _debugbuf[20] = { 0 };
 
-#if 0
+    #if 0
     struct PowerState power_state = BSP_Power_get();
     nformat_u32s(_debugbuf, 20 - 1, "% % %", power_state.power, power_state.period1, power_state.period2);
-#endif
+    BSP_Display_write_text("AAAAAAAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
+    BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
+    #endif
 
-#if 0
+    #if 0
     struct Error e = Oven_error();
     nformat_i32s(_debugbuf, 20 - 1, "% % % %", e.p, e.i, e.d, r.gradient);
-#endif
-
-#if 1
-    nformat_u32s(_debugbuf, 20-1, "% %", r.index, r.curve.length);
-#endif
-
-    BSP_Display_write_text("AAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
+    BSP_Display_write_text("AAAAAAAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
     BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
+    #endif
+
+    #if 0
+    nformat_u32s(_debugbuf, 20-1, "% %", r.index, r.curve.length);
+    BSP_Display_write_text("AAAAAAAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
+    BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
+    #endif
 
 #endif
 
@@ -340,8 +340,6 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
 
     return CURVE;
 }
-
-#undef ON_CHANGE
 
 int main(void) {
     BSP_init(T_SAMPLE_PERIOD_ms);
@@ -362,6 +360,14 @@ int main(void) {
             case PID_EDIT: next_state = edit_pid(changed_state); break;
             case EXT_CONTROL: next_state = external_control(changed_state, &curve_index); break;
         }
+
+        uint32_t power = BSP_Power_get().power;
+        ON_CHANGE(power, {
+            char buf[10];
+            nformat_u32(buf, 10, power);
+            BSP_Display_write_text("AAAAAAA", 280, 10, MENU_FONT, WHITE,  WHITE);
+            BSP_Display_write_text(buf, 280, 10, MENU_FONT, BLACK, WHITE);
+        });
 
         changed_state = next_state != current_state;
         current_state = next_state;
