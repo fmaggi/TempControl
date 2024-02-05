@@ -3,6 +3,8 @@
 #include "bsp.h"
 #include "display.h"
 #include "io.h"
+#include "string.h"
+#include "utils.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -75,7 +77,7 @@ void UI_Update_entry(const struct UI* ui, uint8_t entry, uint8_t from) {
 
     uint16_t y = FIRST_ENTRY + BOX_HEIGHT * entry + MARGIN;
 
-    BSP_Display_fill_rect(xOffset + 10, y, 40, MENU_FONT[2], color);
+    BSP_Display_fill_rect(xOffset + 10, y, 80, MENU_FONT[2], color);
     BSP_Display_write_text(ui->entries[entry] + from, STARTX + xOffset, y, MENU_FONT, FG_COLOR, color);
 }
 
