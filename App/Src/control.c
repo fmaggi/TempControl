@@ -15,7 +15,6 @@ static const volatile FP16 DT = (ONE * T_SAMPLE_PERIOD_ms) / 1000;
 static volatile uint16_t TEMP = 0;
 static volatile uint16_t TARGET_TEMP = 0;
 
-#define MAX_INITIAL_ERROR  3
 #define INTEGRAL_ERROR_LEN 32
 #define MAX_INTEGRAL_ERROR 1000
 
