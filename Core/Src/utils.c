@@ -1,6 +1,7 @@
 #include "utils.h"
 
 #include <stdarg.h>
+#include <stdint.h>
 
 int32_t nformat_i32s(char* buf, uint32_t len, const char* fmt, ...) {
     const char* cur = fmt;
@@ -8,7 +9,7 @@ int32_t nformat_i32s(char* buf, uint32_t len, const char* fmt, ...) {
     va_start(args, fmt);
 
     uint32_t written = 0;
-    while ((uint32_t)written < len && *cur) {
+    while (written < len && *cur) {
         if (*cur == '%') {
             int32_t v = va_arg(args, int32_t);
             int32_t w = nformat_i32(buf+written, len-(uint32_t)written, v);
@@ -36,7 +37,7 @@ int32_t nformat_u32s(char* buf, uint32_t len, const char* fmt, ...) {
     va_start(args, fmt);
 
     uint32_t written = 0;
-    while ((uint32_t)written < len && *cur) {
+    while (written < len && *cur) {
         if (*cur == '%') {
             uint32_t v = va_arg(args, uint32_t);
             int32_t w = nformat_u32(buf+written, len-(uint32_t)written, v);
@@ -91,7 +92,11 @@ int32_t nformat_u32(char* buf, uint32_t len, uint32_t value) {
 int32_t nformat_i32(char* buf, uint32_t len, int32_t value) {
     if (value < 0) {
         buf[0] = '-';
-        return nformat_u32(buf+1, len-1, (uint32_t)-value) + 1;
+        int32_t w = nformat_u32(buf+1, len-1, (uint32_t)-value);
+        if (w < 0) {
+            return -1;
+        }
+        return w+1;
     } else {
         return nformat_u32(buf, len, (uint32_t)value);
     }
