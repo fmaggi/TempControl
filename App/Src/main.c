@@ -237,7 +237,7 @@ static AppState measure_temp(uint8_t first_entry) {
 
     uint16_t t = Oven_temperature();
     ON_CHANGE(t, {
-        nformat_u32(measurement+5, 50-5-1, t);
+        nformat_u32(measurement + 5, 50 - 5 - 1, t);
         UI_Update_entry(&ui, 0, 5);
     });
 
@@ -285,13 +285,13 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
 
     uint16_t target = Oven_target();
     ON_CHANGE(target, {
-        nformat_u32(set_point_buf+13, 50-13-1, target);
+        nformat_u32(set_point_buf + 13, 50 - 13 - 1, target);
         UI_Update_entry(&ui, 0, 13);
     });
 
     uint16_t temp = Oven_temperature();
     ON_CHANGE(temp, {
-        nformat_u32(temp_buf+5, 50-5-1, temp);
+        nformat_u32(temp_buf + 5, 50 - 5 - 1, temp);
         UI_Update_entry(&ui, 1, 5);
     });
 
@@ -301,7 +301,7 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
         data[1] = elapsed_seconds;
         data[2] = temp;
         data[3] = target;
-        BSP_Comms_transmit((uint8_t*) data, sizeof(uint16_t) * 4);
+        BSP_Comms_transmit_block((uint8_t*) data, sizeof(uint16_t) * 4);
     });
 
     UI_Select(&ui);
@@ -365,7 +365,7 @@ int main(void) {
         ON_CHANGE(power, {
             char buf[10];
             nformat_u32(buf, 10, power);
-            BSP_Display_write_text("AAAAAAA", 280, 10, MENU_FONT, WHITE,  WHITE);
+            BSP_Display_write_text("AAAAAAA", 280, 10, MENU_FONT, WHITE, WHITE);
             BSP_Display_write_text(buf, 280, 10, MENU_FONT, BLACK, WHITE);
         });
 
