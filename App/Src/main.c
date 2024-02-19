@@ -315,9 +315,9 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
 #ifdef DEBUG
     char _debugbuf[20] = { 0 };
 
-    #if 1
+    #if 0
     struct Error e = Oven_error();
-    nformat_i32s(_debugbuf, 20 - 1, "% % % %", e.p, e.i, e.d, FP_toInt(r.gradient));
+    nformat_i32s(_debugbuf, 20 - 1, "% % %", e.p, e.i, e.d);
     BSP_Display_write_text("AAAAAAAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
     BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
     #endif
