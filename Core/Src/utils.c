@@ -86,6 +86,8 @@ int32_t nformat_u32(char* buf, uint32_t len, uint32_t value) {
         buf[i] = aux[written - i - 1];
     }
 
+    buf[written] = 0;
+
     return written;
 }
 

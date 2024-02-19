@@ -11,7 +11,7 @@ TIM_HandleTypeDef htim4;
 #define IO_TIM            TIM4
 #define IO_TIM_FREEZE_DBG __HAL_DBGMCU_FREEZE_TIM4
 
-#define DEBOUNCE 50
+#define DEBOUNCE 100
 
 UART_HandleTypeDef huart1;
 

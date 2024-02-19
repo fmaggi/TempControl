@@ -11,8 +11,7 @@ extern "C" {
 
 struct PowerState {
     uint32_t power;
-    uint32_t period1;
-    uint32_t period2;
+    uint8_t on;
 };
 
 void BSP_Power_init(void);

@@ -1,5 +1,6 @@
 #include "power.h"
 
+#include "bsp.h"
 #include "bsp_internal.h"
 #include "stm32f1xx_hal_rcc.h"
 #include "stm32f1xx_hal_tim.h"
@@ -19,6 +20,7 @@ static const uint32_t MAX_PERIOD = HALF_CYCLE_TIME / TICK;
 static const uint32_t POWER_TO_PERIOD = MAX_PERIOD / MAX_POWER;
 static const uint32_t HALF_POWER = MAX_POWER / 2;
 
+static volatile uint8_t on = 0;
 static volatile uint32_t current_power = 0;
 static volatile uint32_t period1 = UNREACHABLE_PERIOD;
 static volatile uint32_t period2 = UNREACHABLE_PERIOD;
@@ -43,9 +45,11 @@ void BSP_Power_start(void) {
     HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
     HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_2);
     HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_3);
+    on = 1;
 }
 
 void BSP_Power_stop(void) {
+    on = 0;
     BSP_Power_set(0);
     HAL_GPIO_WritePin(Triac1_GPIO_Port, Triac1_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(Triac2_GPIO_Port, Triac2_Pin, GPIO_PIN_RESET);
@@ -61,8 +65,7 @@ void BSP_Power_stop(void) {
 struct PowerState BSP_Power_get(void) {
     struct PowerState state;
     state.power = current_power;
-    state.period1 = period1;
-    state.period2 = period2;
+    state.on = on;
     return state;
 }
 
@@ -112,6 +115,7 @@ void Trigger_Triac(GPIO_TypeDef* port, uint16_t pin) {
 }
 
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim) {
+    if (!on) Error_Handler("Shouldn't be on");
     __disable_irq();
     if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) {
         /* htim->Instance->CCR1 = UNREACHABLE_PERIOD; */

@@ -38,7 +38,7 @@ static void TIM_init(uint32_t sample_period);
 static void ADC_init(void);
 
 void BSP_T_init(uint32_t sample_period_ms) {
-    TIM_init(sample_period_ms * 1000);
+    TIM_init(sample_period_ms * 1000 / T_NUM);
     ADC_init();
     ADC_TIM_FREEZE_DBG();
 }
@@ -63,11 +63,14 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
 
     t -= old_t;
     t += new_t;
-    uint32_t _t = t / T_NUM;
-    BSP_T_on_conversion(_t);
-
     ts[t_index] = new_t;
-    t_index = MOD_POW2(t_index + 1, T_NUM);
+    t_index += 1;
+
+    if (t_index == T_NUM) {
+        uint32_t _t = t / T_NUM;
+        BSP_T_on_conversion(_t);
+        t_index = 0;
+    }
 }
 
 static void TIM_init(uint32_t sample_period) {

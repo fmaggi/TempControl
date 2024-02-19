@@ -5,7 +5,7 @@
 
 #include <stdint.h>
 
-#define T_SAMPLE_PERIOD_ms 100
+#define T_SAMPLE_PERIOD_ms 500
 #define MAX_CURVE_LENGTH 50
 
 struct CurvePoint {
@@ -26,6 +26,7 @@ struct CurveRunner {
 };
 
 void Curve_start(struct CurveRunner* curve, uint8_t curve_index);
+void Curve_stop(struct CurveRunner* curve);
 uint8_t Curve_step(struct CurveRunner* curve, uint16_t time);
 
 typedef union {
@@ -39,11 +40,13 @@ typedef union {
 PID Oven_get_PID(void);
 void Oven_set_PID(PID pid);
 
-uint16_t Oven_target(void);
-uint16_t Oven_temperature(void);
+uint16_t Oven_get_temperature(void);
+void Oven_set_temperature(uint16_t temperature);
+
+uint16_t Oven_get_target(void);
+void Oven_set_target(uint16_t temperature);
 
 void Oven_control(uint16_t current_temperature);
-void Oven_set_target(uint16_t temperature);
 
 struct Error {
     int32_t p, i, d;

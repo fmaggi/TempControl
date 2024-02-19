@@ -1,3 +1,49 @@
+/// TARGET_TEMP:
+///     min: 0
+///     max: 300
+/// CURRENT_TEMP:
+///     min: 0
+///     max: 300 or else it errors
+///
+/// ------------------------------
+///
+/// ERROR (TARGET_TEMP - CURRENT_TEMP):
+///     min: 0 - 300 = -300
+///     max: 300 - 0 = 300
+///
+/// -----------------------------
+///
+/// PID (these values are an upper bound):
+///     P: ~max: 20
+///     I: ~max: 5
+///     D: ~max: 400
+///
+/// ----------------------------
+///
+/// proportional term is fine
+///     ~max: +/- 6000
+///
+/// derivative of error can be high if curve has a steep ascent.
+/// let's say a curve goes from 0°C to 100°C over 1 second.
+/// derivative of error will be 100 as oven will not be able to follow
+///     ~max: 40000
+///
+/// divided by DT which is small, this gets worse
+///
+/// integral of error can be high if oven doesn't follow curve well.
+/// we also limit the max value of integral error to 1000.
+///     ~max: 5000
+///
+/// FP16 -> int16_t
+///     max: 32767
+///
+/// ----------------------------
+///
+/// Derivative term is the problem
+///
+/// Conclusion -> Be carefule around derivative term
+///
+
 #include "control.h"
 
 #include "bsp.h"
@@ -15,8 +61,12 @@ static const volatile FP16 DT = (ONE * T_SAMPLE_PERIOD_ms) / 1000;
 static volatile uint16_t TEMP = 0;
 static volatile uint16_t TARGET_TEMP = 0;
 
-#define INTEGRAL_ERROR_LEN 32
+#define INTEGRAL_ERROR_LEN 64
 #define MAX_INTEGRAL_ERROR 1000
+
+#if MAX_INTEGRAL_ERROR * 5 > 32767
+    #error "Integral power component could overflow, reduce MAX_INTEGRAL_ERROR value"
+#endif
 
 static volatile int32_t I_ERROR = 0;
 static volatile int32_t IE_buf[INTEGRAL_ERROR_LEN] = { 0 };
@@ -24,13 +74,13 @@ static volatile uint8_t IE_index = 0;
 
 static volatile int32_t LAST_ERROR = 0;
 
-static volatile int32_t D_ERRROR = 0;
+static volatile int32_t D_ERROR = 0;
 
 static void oven_start(void);
 static void oven_stop(void);
 
 static FP16 gradient(struct CurvePoint current, struct CurvePoint next) {
-    FP16 dtemp = FP_fromInt(next.temperature - current.temperature);
+    FP16 dtemp = FP_fromInt((int16_t) (next.temperature - current.temperature));
     uint16_t dtime = next.time_s - current.time_s;
     return dtemp / dtime;
 }
@@ -45,16 +95,20 @@ void Curve_start(struct CurveRunner* r, uint8_t curve_index) {
     oven_start();
 }
 
+void Curve_stop(struct CurveRunner* r) {
+    (void) r;
+    oven_stop();
+}
+
 static uint16_t get_target(const struct CurveRunner* r, uint16_t time) {
     struct CurvePoint point = r->curve.points[r->index];
     uint16_t dtime = time - point.time_s;
     FP16 dtemp = r->gradient * dtime;
-    return point.temperature + FP_toInt(dtemp);
+    return point.temperature + (uint16_t) FP_toInt(dtemp);
 }
 
 uint8_t Curve_step(struct CurveRunner* r, uint16_t time) {
     if (r->index >= r->curve.length) {
-        oven_stop();
         return 1;
     }
 
@@ -89,7 +143,7 @@ void Oven_set_PID(PID pid_) {
 static void oven_stop(void) {
     LAST_ERROR = 0;
     I_ERROR = 0;
-    D_ERRROR = 0;
+    D_ERROR = 0;
     memset((void*) IE_buf, 0, sizeof(IE_buf));
     IE_index = 0;
     Oven_set_target(0);
@@ -102,24 +156,26 @@ struct Error Oven_error(void) {
     struct Error e;
     e.p = LAST_ERROR;
     e.i = I_ERROR;
-    e.d = D_ERRROR;
+    e.d = D_ERROR;
     return e;
 }
 
-uint16_t Oven_temperature(void) {
+void Oven_set_temperature(uint16_t temperature) {
+    TEMP = temperature;
+}
+
+uint16_t Oven_get_temperature(void) {
     return TEMP;
 }
 
-uint16_t Oven_target(void) {
+uint16_t Oven_get_target(void) {
     return TARGET_TEMP;
 }
 
 void Oven_control(uint16_t current_temp) {
-    TEMP = current_temp;
-
     int32_t p_error = (int32_t) TARGET_TEMP - (int32_t) current_temp;
 
-    D_ERRROR = p_error - LAST_ERROR;
+    D_ERROR = p_error - LAST_ERROR;
 
     I_ERROR -= IE_buf[IE_index];
     I_ERROR += p_error;
@@ -128,35 +184,11 @@ void Oven_control(uint16_t current_temp) {
     I_ERROR = I_ERROR < -MAX_INTEGRAL_ERROR ? -MAX_INTEGRAL_ERROR : I_ERROR;
 
     int32_t total_error = 0;
-    if (p_error < 0) {
-        uint32_t pe = (uint32_t)(-p_error);
-        total_error -= (int32_t)FP_toInt(pid.p * pe);
-    } else {
-        uint32_t pe = (uint32_t)p_error;
-        total_error += (int32_t)FP_toInt(pid.p * pe);
-    }
+    total_error += (int32_t) FP_toInt(pid.p * p_error);
+    total_error += (int32_t) FP_toInt(FP_mul(pid.i * I_ERROR, DT));
+    total_error += (int32_t) FP_toInt(FP_div(pid.d * D_ERROR, DT));
 
-    if (I_ERROR < 0) {
-        uint32_t ie = (uint32_t)(-I_ERROR);
-        FP16 v = FP_mul(pid.i * ie, DT);
-        total_error -= (int32_t)FP_toInt(v);
-    } else {
-        uint32_t ie = (uint32_t)(I_ERROR);
-        FP16 v = FP_mul(pid.i * ie, DT);
-        total_error += (int32_t)FP_toInt(v);
-    }
-
-    if (D_ERRROR < 0) {
-        uint32_t de = (uint32_t)(-D_ERRROR);
-        FP16 v = FP_div(pid.d * de, DT);
-        total_error -= (int32_t)FP_toInt(v);
-    } else {
-        uint32_t de = (uint32_t)(D_ERRROR);
-        FP16 v = FP_div(pid.d * de, DT);
-        total_error += (int32_t)FP_toInt(v);
-    }
-
-    uint32_t power = total_error > 0 ? (uint32_t)total_error : 0;
+    uint32_t power = total_error > 0 ? (uint32_t) total_error : 0;
     power = power > MAX_POWER ? MAX_POWER : power;
 
     BSP_Power_set(power);
@@ -168,11 +200,4 @@ void Oven_control(uint16_t current_temp) {
 
 void Oven_set_target(uint16_t target) {
     TARGET_TEMP = target;
-}
-
-void BSP_T_on_conversion(uint32_t temperature) {
-    if (temperature > 300) {
-        Error_Handler("Horno muy caliente");
-    }
-    Oven_control((uint16_t) temperature);
 }

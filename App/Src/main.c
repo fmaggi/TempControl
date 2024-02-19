@@ -235,7 +235,7 @@ static AppState measure_temp(uint8_t first_entry) {
         BSP_T_start();
     }
 
-    uint16_t t = Oven_temperature();
+    uint16_t t = Oven_get_temperature();
     ON_CHANGE(t, {
         nformat_u32(measurement + 5, 50 - 5 - 1, t);
         UI_Update_entry(&ui, 0, 5);
@@ -252,8 +252,10 @@ static AppState measure_temp(uint8_t first_entry) {
 static AppState curve(uint8_t first_entry, uint8_t curve_index) {
 #define STOP()                                                                                                                 \
     do {                                                                                                                       \
+        Curve_stop(&r);                                                                                                        \
         const uint16_t ending = 0xABAB;                                                                                        \
         BSP_Comms_transmit_block((uint8_t*) &ending, sizeof(uint16_t));                                                        \
+        BSP_Comms_abort();                                                                                                     \
         return MAIN_MENU;                                                                                                      \
     } while (0)
 
@@ -283,13 +285,13 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
         STOP();
     }
 
-    uint16_t target = Oven_target();
+    uint16_t target = Oven_get_target();
     ON_CHANGE(target, {
         nformat_u32(set_point_buf + 13, 50 - 13 - 1, target);
         UI_Update_entry(&ui, 0, 13);
     });
 
-    uint16_t temp = Oven_temperature();
+    uint16_t temp = Oven_get_temperature();
     ON_CHANGE(temp, {
         nformat_u32(temp_buf + 5, 50 - 5 - 1, temp);
         UI_Update_entry(&ui, 1, 5);
@@ -314,16 +316,9 @@ static AppState curve(uint8_t first_entry, uint8_t curve_index) {
 #ifdef DEBUG
     char _debugbuf[20] = { 0 };
 
-    #if 0
-    struct PowerState power_state = BSP_Power_get();
-    nformat_u32s(_debugbuf, 20 - 1, "% % %", power_state.power, power_state.period1, power_state.period2);
-    BSP_Display_write_text("AAAAAAAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
-    BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
-    #endif
-
-    #if 0
+    #if 1
     struct Error e = Oven_error();
-    nformat_i32s(_debugbuf, 20 - 1, "% % % %", e.p, e.i, e.d, r.gradient);
+    nformat_i32s(_debugbuf, 20 - 1, "% % % %", e.p, e.i, e.d, FP_toInt(r.gradient));
     BSP_Display_write_text("AAAAAAAAAAAAAAAAAAA", 36, 190, FONT3, BG_COLOR, BG_COLOR);
     BSP_Display_write_text(_debugbuf, 36, 190, FONT3, FG_COLOR, BG_COLOR);
     #endif
@@ -361,15 +356,33 @@ int main(void) {
             case EXT_CONTROL: next_state = external_control(changed_state, &curve_index); break;
         }
 
-        uint32_t power = BSP_Power_get().power;
-        ON_CHANGE(power, {
-            char buf[10];
-            nformat_u32(buf, 10, power);
-            BSP_Display_write_text("AAAAAAA", 280, 10, MENU_FONT, WHITE, WHITE);
-            BSP_Display_write_text(buf, 280, 10, MENU_FONT, BLACK, WHITE);
-        });
+        struct PowerState state = BSP_Power_get();
+        if (state.on) {
+            uint32_t power = state.power;
+            ON_CHANGE(power, {
+                char buf[10];
+                nformat_u32(buf, 10, power);
+                BSP_Display_fill_rect(280, 10, SCREEN_WIDTH - 280, MENU_FONT[2], WHITE);
+                BSP_Display_write_text(buf, 280, 10, MENU_FONT, BLACK, WHITE);
+            });
+        } else if (changed_state) {
+            // We put this logic before changed_state is assigned to run after setup on a changed state event
+            // to avoid being cleared by the state handler function
+            BSP_Display_fill_rect(280, 10, SCREEN_WIDTH - 280, MENU_FONT[2], WHITE);
+            BSP_Display_write_text("OFF", 280, 10, MENU_FONT, RED, WHITE);
+        }
 
         changed_state = next_state != current_state;
         current_state = next_state;
+    }
+}
+
+void BSP_T_on_conversion(uint32_t temperature) {
+    if (temperature > 300) {
+        Error_Handler("Horno muy caliente");
+    }
+    Oven_set_temperature((uint16_t) temperature);
+    if (BSP_Power_get().on) {
+        Oven_control((uint16_t) temperature);
     }
 }
