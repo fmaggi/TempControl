@@ -66,7 +66,6 @@ static AppState main_menu(uint8_t first_entry, uint8_t* curve_index) {
             case 3: *curve_index = menu.pos - 1; return CURVE;
             case 4: return PID_EDIT;
         }
-        return (AppState) (menu.pos + 1);
     }
 
     if (BSP_Comms_received()) {
